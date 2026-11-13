@@ -1,52 +1,56 @@
 # TraceAi — AI Detection Pipeline & Scoring Rules
 
-Dokumen ini menjelaskan arsitektur model *Computer Vision*, aturan pembobotan skor (*hybrid scoring*), pembagian ambang batas (*threshold*), serta logika ekstraksi bukti visual (*Grad-CAM*) untuk sistem deteksi gambar produk.
+Dokumen ini menjelaskan arsitektur model *Computer Vision* (`efficientnet_b0`) versi revisi yang telah dilatih, tahapan *preprocessing* tensor sesuai `traceai_config_revised.json`, aturan ambang batas (*threshold*), serta struktur bukti temuan untuk sistem deteksi gambar produk **TraceAi**.
 
 ---
 
-## 1. Arsitektur & Preprocessing Input
+## 1. Spesifikasi Model & Preprocessing Input (`_revised`)
 
-Sebelum gambar dievaluasi oleh model AI, gambar wajib melewati tahapan standarisasi berikut agar hasil prediksi konsisten:
+Model Machine Learning dimuat satu kali saat *startup* server menggunakan `map_location="cpu"` (kemudian dipindahkan ke `cuda` jika tersedia) dalam mode `.eval()`:
 
-*   **Arsitektur Model Utama:** Vision Transformer (ViT) / ConvNeXt / ResNet-50 (*Binary Classifier: Real vs. AI-Generated*).
-*   **Dataset Acuan:** Kombinasi dataset foto produk komersial asli dan gambar sintetis (seperti **CIFAKE**, **Artifact**, serta generator modern Midjourney/Flux/DALL-E).
-*   **Input Tensor:** Gambar di-resize ke resolusi standar model (misal `224x224` atau `384x384` piksel) dengan normalisasi *mean* dan *std* ImageNet.
-*   **Catatan Kompresi:** Hindari kompresi ulang yang ekstrem sebelum inferensi karena artefak frekuensi tinggi (*high-frequency noise*) adalah indikator utama gambar AI.
+* **Konfigurasi Utama:** `Backend/models/traceai_config_revised.json` (`best_epoch: 15`, `seed: 42`)
+* **Bobot Model Utama:** `Backend/models/traceai_efficientnet_b0_cifake_revised.pth`
+* **Bobot Model Fallback:** `Backend/models/traceai_best_model_revised.pth`
+* **Arsitektur Model Utama:** `efficientnet_b0` (`torchvision.models.efficientnet_b0`) dengan layer klasifikasi akhir (`classifier[1]`) disesuaikan untuk 2 kelas.
+* **Kelas Target (`class_names`):**
+  * Index `0`: `"NON_AI"` (Foto produk asli)
+  * Index `1`: `"AI_GENERATED"` (Gambar hasil generator AI)
+* **Tahapan Preprocessing Gambar (Identik dengan Pipeline Evaluasi Colab):**
+  1. Perbaiki orientasi gambar dari tag EXIF menggunakan **`ImageOps.exif_transpose`** lalu konversi mode warna ke **`RGB`** (`PIL.Image.convert("RGB")`).
+  2. *Resize* ukuran gambar ke **`224 × 224` piksel** (`image_size: 224`) melalui `torchvision.transforms.Resize((224, 224))`.
+  3. Konversi ke tensor `float32` dalam rentang `[0.0, 1.0]` menggunakan `torchvision.transforms.ToTensor()`.
+  4. Normalisasi kanal warna menggunakan parameter dari `traceai_config_revised.json` melalui `torchvision.transforms.Normalize`:
+     * `normalization_mean`: `[0.485, 0.456, 0.406]`
+     * `normalization_std`: `[0.229, 0.224, 0.225]`
 
 ---
 
-## 2. Hybrid Scoring Logic (Penggabungan Forensik & AI)
+## 2. Logika Inferensi & Perhitungan Skor (`ai_probability`)
 
-Skor akhir (`ai_probability`) tidak hanya bergantung pada tebakan neural network, tetapi digabungkan dengan pemeriksaan metadata forensik:
-
-1.  **C2PA / Content Credentials Check (Prioritas Tertinggi):**
-    *   Jika file memiliki tanda kriptografi **C2PA** yang berasal dari generator AI (misal: *Adobe Firefly*, *DALL-E 3*), skor langsung dikunci ke **`99%`** (`AI tinggi`) tanpa perlu ragu.
-2.  **Neural Network Inference (Bobot 85%):**
-    *   Mengambil nilai probabilitas *softmax* dari kelas `AI-Generated`.
-3.  **EXIF & Artifact Heuristics (Bobot 15%):**
-    *   Mengecek keberadaan metadata kamera fisik (ISO, Aperture, Focal Length) serta pola *frequency domain* (FFT) untuk mendeteksi kehalusan tekstur yang tidak wajar.
+1. **Forward Pass (Tanpa Gradien):**
+   * Model dijalankan dalam mode evaluasi (`model.eval()`) di dalam blok `torch.no_grad()`.
+2. **Probabilitas Softmax Dinamis:**
+   * Output *logits* dari model dikonversi menjadi distribusi probabilitas menggunakan `torch.softmax(logits, dim=1)`.
+   * Indeks kelas `"AI_GENERATED"` dicari secara dinamis dari `class_names` (`class_names.index("AI_GENERATED")`), dikalikan `100.0`, lalu dikonversi ke tipe `float` standar Python (`0.0` – `100.0`) untuk mengisi field `ai_probability`.
+3. **Ekstraksi Metadata Forensik Pendamping (EXIF):**
+   * Menggunakan `exifread` untuk memeriksa keberadaan metadata perangkat kamera fisik (`Image Make`, `Image Model`) sebagai bukti tambahan pada bagian `breakdown.metadata`.
 
 ---
 
 ## 3. Ambang Batas Klasifikasi (Threshold Rules)
 
-Hasil persentase (`0% - 100%`) diterjemahkan ke dalam status UI Front-End menggunakan aturan berikut:
+Nilai `ai_probability` (`0.0 – 100.0`) diterjemahkan ke dalam status UI Front-End menggunakan aturan berikut:
 
-| Rentang Skor | Label Klasifikasi | Warna Badge UI | Keyakinan Model (`model_confidence`) | Teks Kesimpulan (`verdict_text`) |
+| Rentang Skor (`ai_probability`) | Label Klasifikasi (`classification`) | Warna Badge UI | Keyakinan Model (`model_confidence`) | Teks Kesimpulan (`verdict_text`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **`75% - 100%`** | `AI tinggi` | 🟠 Oranye / Merah | `Tinggi` / `Sedang` | *"Gambar ini sangat mungkin hasil generator AI."* |
-| **`40% - 74%`** | `AI sedang` | 🟡 Kuning | `Rendah` / `Sedang` | *"Gambar terindikasi manipulasi atau terkompresi berat."* |
-| **`0% - 39%`** | `AI rendah` | 🟢 Hijau Neon | `Tinggi` | *"Gambar ini kemungkinan besar foto produk asli."* |
+| **`75.0% – 100.0%`** | `AI tinggi` | 🟠 Oranye | `Tinggi` ($\ge 85\%$) / `Sedang` | *"Gambar ini sangat mungkin hasil generator AI."* |
+| **`40.0% – 74.9%`** | `AI sedang` | 🟡 Kuning | `Rendah` / `Sedang` | *"Gambar terindikasi manipulasi atau terkompresi berat."* |
+| **`0.0% – 39.9%`** | `AI rendah` | 🟢 Hijau Neon | `Tinggi` ($\le 15\%$) / `Sedang` | *"Gambar ini kemungkinan besar foto produk asli."* |
 
 ---
 
-## 4. Logika Ekstraksi "Bukti Temuan" (Explainable AI)
+## 4. Struktur "Bukti Temuan" (`anomalies` & `breakdown`)
 
-Untuk mengisi halaman **Bukti Temuan** di Front-End, pipeline AI melakukan 4 analisis terpisah:
-
-1.  **Area Janggal (Visual Bounding Box):**
-    *   Menggunakan **Grad-CAM** (*Gradient-weighted Class Activation Mapping*) pada layer terakhir model untuk mencari area dengan aktivasi gradien tertinggi.
-    *   Area dengan intensitas panas di atas ambang batas dikonversi menjadi koordinat normalisasi `[ymin, xmin, ymax, xmax]` (skala `0 - 1000`) untuk digambar sebagai kotak oranye di UI.
-2.  **Tekstur Permukaan:** Mengukur varians *noise* lokal. Jika terlalu seragam/halus $\rightarrow$ status `Janggal`.
-3.  **Teks dan Logo:** Menggunakan deteksi teks (OCR ringan) untuk mengecek distorsi karakter pada kemasan produk $\rightarrow$ status `Janggal` jika skor kepercayaan OCR rendah pada area teks.
-4.  **Cahaya dan Bayangan:** Mengevaluasi konsistensi arah gradien pencahayaan objek $\rightarrow$ status `Wajar` atau `Janggal`.
+Karena model `efficientnet_b0` melakukan klasifikasi tingkat gambar utuh (*whole-image classification*):
+1. **`anomalies`:** Dikembalikan sebagai list kosong `[]`. Komponen Front-End (`EvidenceScreen.jsx`) secara otomatis menampilkan label *"Tidak ada area janggal"* ketika `anomalies` bernilai `[]`.
+2. **`breakdown`:** Tetap menyediakan 4 metrik pemeriksaan (`texture`, `text_logo`, `lighting`, dan `metadata`) yang disesuaikan dengan hasil inferensi model dan pemeriksaan EXIF agar tampilan kartu di halaman **Bukti Temuan** tetap informatif dan konsisten.

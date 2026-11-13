@@ -76,20 +76,11 @@ Menerima file gambar dan mengembalikan skor probabilitas beserta bukti temuan ya
     "scan_id": "scn_89210",
     "filename": "foto-lampu-01.jpg",
     "timestamp": "2026-11-07T22:13:00Z",
-    "ai_probability": 86,
+    "ai_probability": 86.4,
     "classification": "AI tinggi",
-    "model_confidence": "Sedang",
+    "model_confidence": "Tinggi",
     "verdict_text": "Gambar ini sangat mungkin hasil generator AI.",
-    "anomalies": [
-      {
-        "box":,
-        "label": "Area janggal"
-      },
-      {
-        "box":,
-        "label": "Area janggal"
-      }
-    ],
+    "anomalies": [],
     "breakdown": {
       "texture": {
         "status": "Janggal",
