@@ -53,7 +53,10 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
               <ScanningCards />
             ) : (
               <>
-                <VerdictCard probability={scan.result.probability} />
+                <VerdictCard
+                  probability={scan.result.probability}
+                  verdictText={scan.result.verdictText}
+                />
                 <ConfidenceCard
                   probability={scan.result.probability}
                   confidence={scan.result.confidence}
@@ -188,9 +191,10 @@ function ScanningCards() {
   )
 }
 
-function VerdictCard({ probability }) {
+function VerdictCard({ probability, verdictText }) {
   const value = useCountUp(probability)
   const verdict = getVerdict(probability)
+  const text = verdictText || verdict.text
 
   return (
     <section
@@ -219,7 +223,7 @@ function VerdictCard({ probability }) {
         <div className={`h-full rounded-full ${verdict.barClass}`} style={{ width: `${value}%` }} />
       </div>
 
-      <p className="mt-4 text-[17px] leading-snug font-semibold text-balance">{verdict.text}</p>
+      <p className="mt-4 text-[17px] leading-snug font-semibold text-balance">{text}</p>
     </section>
   )
 }

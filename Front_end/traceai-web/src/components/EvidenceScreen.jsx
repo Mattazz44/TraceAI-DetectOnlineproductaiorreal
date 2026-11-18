@@ -41,7 +41,7 @@ export default function EvidenceScreen({ scan, onBack, onHome }) {
     const lines = findings.map((f) => `• ${f.title}: ${STATUS[f.status].label}`)
     const text = [
       `Hasil cek TraceAI untuk "${scan.name}": ${probability}% kemungkinan buatan AI.`,
-      getVerdict(probability).text,
+      scan.result.verdictText || getVerdict(probability).text,
       lines.length ? `\nBukti temuan:\n${lines.join('\n')}` : '',
       '\nCek gambar produkmu sendiri di TraceAI:',
     ]

@@ -1,15 +1,15 @@
 ﻿/** Human-readable interpretation of a detection result. */
 
 export function getVerdict(probability) {
-  if (probability >= 80)
+  if (probability >= 75)
     return { text: 'Gambar ini sangat mungkin hasil generator AI.', barClass: 'bg-amber' }
-  if (probability >= 60)
-    return { text: 'Gambar ini kemungkinan hasil generator AI.', barClass: 'bg-amber' }
   if (probability >= 40)
-    return { text: 'Belum bisa dipastikan. Cek bukti sebelum mengambil keputusan.', barClass: 'bg-[#ffe066]' }
-  if (probability >= 20)
-    return { text: 'Gambar ini kemungkinan foto asli.', barClass: 'bg-neon' }
-  return { text: 'Gambar ini sangat mungkin foto asli.', barClass: 'bg-neon' }
+    return { text: 'Gambar ini kemungkinan hasil generator AI.', barClass: 'bg-amber' }
+  if (probability >= 12)
+    return { text: 'Gambar terindikasi sintetis atau manipulasi digital.', barClass: 'bg-[#ffe066]' }
+  if (probability >= 5)
+    return { text: 'Gambar ini kemungkinan foto produk asli.', barClass: 'bg-neon' }
+  return { text: 'Gambar ini sangat mungkin foto produk asli.', barClass: 'bg-neon' }
 }
 
 /**

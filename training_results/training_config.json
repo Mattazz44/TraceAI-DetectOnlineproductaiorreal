@@ -1,0 +1,17 @@
+{
+  "project": "TraceAI",
+  "architecture": "EfficientNet-B0",
+  "pretrained": "ImageNet",
+  "image_size": 384,
+  "batch_size": 32,
+  "seed": 42,
+  "classes": {
+    "0": "NON_AI",
+    "1": "AI_GENERATED"
+  },
+  "train_size": 4064,
+  "validation_size": 869,
+  "test_size": 1124,
+  "optimizer": "AdamW",
+  "mixed_precision": "BF16 when supported"
+}

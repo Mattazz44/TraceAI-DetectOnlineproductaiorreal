@@ -35,9 +35,16 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 # =====================================================================
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
-MODEL_CONFIG_PATH = MODELS_DIR / "traceai_config_revised.json"
-MODEL_BUNDLE_PATH = MODELS_DIR / "traceai_efficientnet_b0_cifake_revised.pth"
-MODEL_FALLBACK_PATH = MODELS_DIR / "traceai_best_model_revised.pth"
+MODEL_CONFIG_CANDIDATES = [
+    MODELS_DIR / "traceai_config_final.json",
+    MODELS_DIR / "traceai_config_revised.json",
+]
+MODEL_BUNDLE_CANDIDATES = [
+    MODELS_DIR / "traceai_efficientnet_b0_final.pth",
+    MODELS_DIR / "traceai_best_model_final.pth",
+    MODELS_DIR / "traceai_efficientnet_b0_cifake_revised.pth",
+    MODELS_DIR / "traceai_best_model_revised.pth",
+]
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -60,32 +67,26 @@ def _extract_state_dict(checkpoint):
 
 
 def load_traceai_model():
-    if not MODEL_CONFIG_PATH.exists():
-        raise FileNotFoundError(f"File konfigurasi model tidak ditemukan di: {MODEL_CONFIG_PATH}")
+    # 1. Cari kandidat file konfigurasi JSON
+    config = {}
+    loaded_config_path = None
+    for cp in MODEL_CONFIG_CANDIDATES:
+        if cp.exists():
+            try:
+                with open(cp, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                loaded_config_path = cp
+                break
+            except Exception:
+                pass
 
-    with open(MODEL_CONFIG_PATH, "r", encoding="utf-8") as f:
-        config = json.load(f)
-
-    class_names = list(config["class_names"])
-    image_size = int(config["image_size"])
-    architecture = str(config.get("architecture", "efficientnet_b0"))
-    norm_mean = [float(x) for x in config["normalization_mean"]]
-    norm_std = [float(x) for x in config["normalization_std"]]
-
-    if "AI_GENERATED" not in class_names:
-        raise ValueError(f"Kelas 'AI_GENERATED' tidak ditemukan di class_names: {class_names}")
-    ai_index = class_names.index("AI_GENERATED")
-
-    if architecture != "efficientnet_b0":
-        raise ValueError(f"Arsitektur model tidak didukung: {architecture}")
-
+    # 2. Cari dan muat file bobot model PyTorch
     checkpoint = None
     loaded_model_path = None
     load_errors = []
 
-    for candidate_path in (MODEL_BUNDLE_PATH, MODEL_FALLBACK_PATH):
+    for candidate_path in MODEL_BUNDLE_CANDIDATES:
         if not candidate_path.exists():
-            load_errors.append(f"{candidate_path.name}: file tidak ditemukan")
             continue
         try:
             checkpoint = _torch_load_cpu(candidate_path)
@@ -95,7 +96,56 @@ def load_traceai_model():
             load_errors.append(f"{candidate_path.name}: {exc}")
 
     if checkpoint is None or loaded_model_path is None:
-        raise RuntimeError("Gagal memuat bobot model: " + "; ".join(load_errors))
+        raise RuntimeError("Gagal memuat bobot model: " + ("; ".join(load_errors) if load_errors else "File bobot model tidak ditemukan."))
+
+    bundle_meta = checkpoint if isinstance(checkpoint, dict) else {}
+
+    class_names = list(
+        bundle_meta.get("class_names")
+        or config.get("class_names")
+        or ["NON_AI", "AI_GENERATED"]
+    )
+    image_size = int(
+        bundle_meta.get("image_size")
+        or config.get("image_size")
+        or 384
+    )
+    raw_arch = str(
+        bundle_meta.get("architecture")
+        or config.get("architecture")
+        or "efficientnet_b0"
+    ).lower().replace("-", "_")
+
+    norm_mean = [
+        float(x)
+        for x in (
+            bundle_meta.get("imagenet_mean")
+            or bundle_meta.get("normalization_mean")
+            or config.get("normalization_mean")
+            or [0.485, 0.456, 0.406]
+        )
+    ]
+    norm_std = [
+        float(x)
+        for x in (
+            bundle_meta.get("imagenet_std")
+            or bundle_meta.get("normalization_std")
+            or config.get("normalization_std")
+            or [0.229, 0.224, 0.225]
+        )
+    ]
+    threshold = float(
+        bundle_meta.get("threshold")
+        or config.get("threshold")
+        or 0.12
+    )
+
+    if "AI_GENERATED" not in class_names:
+        raise ValueError(f"Kelas 'AI_GENERATED' tidak ditemukan di class_names: {class_names}")
+    ai_index = class_names.index("AI_GENERATED")
+
+    if raw_arch != "efficientnet_b0":
+        raise ValueError(f"Arsitektur model tidak didukung: {raw_arch}")
 
     state_dict = _extract_state_dict(checkpoint)
 
@@ -116,11 +166,13 @@ def load_traceai_model():
 
     return {
         "model": model,
-        "architecture": architecture,
+        "architecture": raw_arch,
         "model_file": loaded_model_path.name,
+        "config_file": loaded_config_path.name if loaded_config_path else None,
         "class_names": class_names,
         "ai_index": ai_index,
         "image_size": image_size,
+        "threshold": threshold,
         "transform": preprocess_transform,
     }
 
@@ -131,7 +183,7 @@ MODEL_ARTIFACT = load_traceai_model()
 def preprocess_image(pil_img: Image.Image) -> torch.Tensor:
     """
     Samakan orientasi EXIF dengan ImageOps.exif_transpose, konversi ke RGB,
-    resize ke 224x224, konversi ke tensor, dan normalisasi sesuai traceai_config_revised.json.
+    resize ke resolusi model (384x384), konversi ke tensor, dan normalisasi ImageNet.
     """
     rgb_img = ImageOps.exif_transpose(pil_img).convert("RGB")
     tensor = MODEL_ARTIFACT["transform"](rgb_img)
@@ -163,6 +215,8 @@ def read_root():
         "model_architecture": MODEL_ARTIFACT["architecture"],
         "model_file": MODEL_ARTIFACT["model_file"],
         "class_names": MODEL_ARTIFACT["class_names"],
+        "image_size": MODEL_ARTIFACT["image_size"],
+        "threshold": MODEL_ARTIFACT["threshold"],
         "device": str(DEVICE),
     }
 
@@ -225,22 +279,25 @@ async def scan_product_image(image: UploadFile = File(...)):
             detail="Terjadi kesalahan pada server saat menganalisis gambar.",
         ) from exc
 
-    # 6. Tentukan klasifikasi, keyakinan model, dan teks kesimpulan sesuai ambang batas
+    # 6. Tentukan klasifikasi, keyakinan model, dan teks kesimpulan sesuai ambang batas (calibrated threshold)
+    threshold_pct = float(round(MODEL_ARTIFACT.get("threshold", 0.12) * 100.0, 1))
+    is_ai_generated = bool(ai_prob >= threshold_pct)
+
     if ai_prob >= 75.0:
         classification = "AI tinggi"
         model_confidence = "Tinggi" if ai_prob >= 85.0 else "Sedang"
         verdict = "Gambar ini sangat mungkin hasil generator AI."
-    elif ai_prob >= 40.0:
+    elif ai_prob >= threshold_pct:
         classification = "AI sedang"
-        model_confidence = "Sedang" if ai_prob >= 55.0 else "Rendah"
-        verdict = "Gambar terindikasi manipulasi atau terkompresi berat."
+        model_confidence = "Sedang" if ai_prob >= 35.0 else "Rendah"
+        verdict = "Gambar terindikasi sintetis atau manipulasi digital."
     else:
         classification = "AI rendah"
-        model_confidence = "Tinggi" if ai_prob <= 15.0 else "Sedang"
+        model_confidence = "Tinggi" if ai_prob <= max(5.0, threshold_pct / 2.0) else "Sedang"
         verdict = "Gambar ini kemungkinan besar foto produk asli."
 
     is_high_ai = ai_prob >= 75.0
-    is_mid_ai = 40.0 <= ai_prob < 75.0
+    is_mid_ai = threshold_pct <= ai_prob < 75.0
     safe_filename = os.path.basename(image.filename) if image.filename else "unnamed.jpg"
 
     return {
@@ -250,6 +307,8 @@ async def scan_product_image(image: UploadFile = File(...)):
             "filename": safe_filename,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "ai_probability": ai_prob,
+            "is_ai_generated": is_ai_generated,
+            "threshold": threshold_pct,
             "classification": classification,
             "model_confidence": model_confidence,
             "verdict_text": verdict,
