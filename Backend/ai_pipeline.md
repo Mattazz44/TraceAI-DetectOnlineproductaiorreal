@@ -54,8 +54,9 @@ Nilai `ai_probability` (`0.0 – 100.0`) diterjemahkan ke dalam status UI Front-
 
 ---
 
-## 4. Struktur "Bukti Temuan" (`anomalies` & `breakdown`)
+## 4. Struktur "Bukti Temuan" (`anomalies`, `heatmap`, & `breakdown`)
 
-Karena model `efficientnet_b0` melakukan klasifikasi tingkat gambar utuh (*whole-image classification*):
-1. **`anomalies`:** Dikembalikan sebagai list kosong `[]`. Komponen Front-End (`EvidenceScreen.jsx`) secara otomatis menampilkan label *"Tidak ada area janggal"* ketika `anomalies` bernilai `[]`.
-2. **`breakdown`:** Tetap menyediakan 4 metrik pemeriksaan (`texture`, `text_logo`, `lighting`, dan `metadata`) yang disesuaikan dengan hasil inferensi model dan pemeriksaan EXIF agar tampilan kartu di halaman **Bukti Temuan** tetap informatif dan konsisten.
+Untuk mengisi halaman **Bukti Temuan** di Front-End secara akurat dan konsisten:
+1. **`anomalies` (Grad-CAM Bounding Box):** Jika `is_ai_generated == true`, backend menghitung **Grad-CAM** pada layer konvolusi akhir (`model.features`) terhadap selisih logit `AI_GENERATED - NON_AI`, lalu mengekstrak 1–3 area aktivasi tertinggi menjadi koordinat `[ymin, xmin, ymax, xmax]` (skala `0 – 1000`) yang dipetakan ke indikator `texture`, `text_logo`, atau `lighting`. Jika `is_ai_generated == false` (`AI rendah`), `anomalies` dikembalikan sebagai `[]`.
+2. **`heatmap` (Grad-CAM Overlay):** Peta panas RGBA PNG (64×64, base64 data URL) yang dapat ditumpuk langsung di atas pratinjau gambar pada `EvidenceScreen.jsx`.
+3. **`breakdown`:** Menyediakan 4 metrik pemeriksaan (`texture`, `text_logo`, `lighting`, dan `metadata`) yang sinkron dengan hasil inferensi model dan pemeriksaan EXIF.

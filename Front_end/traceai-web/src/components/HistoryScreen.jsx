@@ -3,10 +3,13 @@ import { Camera, ChevronLeft, ChevronRight, History, Search, X } from 'lucide-re
 import ScanThumb from './ScanThumb.jsx'
 import ScoreBadge from './ScoreBadge.jsx'
 
+const isFlagged = (s) =>
+  typeof s.isAiGenerated === 'boolean' ? s.isAiGenerated : s.probability >= 50
+
 const FILTERS = [
   { id: 'all', label: 'Semua', test: () => true },
-  { id: 'high', label: 'AI tinggi', test: (s) => s.probability >= 50 },
-  { id: 'low', label: 'AI rendah', test: (s) => s.probability < 50 },
+  { id: 'high', label: 'AI tinggi', test: (s) => isFlagged(s) },
+  { id: 'low', label: 'AI rendah', test: (s) => !isFlagged(s) },
 ]
 
 const timeFmt = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' })
@@ -215,7 +218,8 @@ export default function HistoryScreen({ scans, onBack, onNewScan, onSelectScan }
 }
 
 function HistoryRow({ scan, onSelect }) {
-  const level = scan.probability >= 50 ? 'AI tinggi' : 'AI rendah'
+  const flagged = isFlagged(scan)
+  const level = scan.probability >= 75 ? 'AI tinggi' : flagged ? 'AI sedang' : 'AI rendah'
   const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : null
 
   return (
@@ -234,7 +238,7 @@ function HistoryRow({ scan, onSelect }) {
           {time ? `${time} · ${level}` : level}
         </p>
       </div>
-      <ScoreBadge probability={scan.probability} />
+      <ScoreBadge probability={scan.probability} isAiGenerated={scan.isAiGenerated} />
       <ChevronRight
         className="size-4.5 shrink-0 text-ink/40 transition group-hover:translate-x-0.5 group-hover:text-ink/70"
         strokeWidth={2.25}

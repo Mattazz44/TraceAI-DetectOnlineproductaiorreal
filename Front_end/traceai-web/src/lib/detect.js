@@ -3,17 +3,11 @@
  *
  * Talks to the FastAPI backend in Backend/main.py:
  *   POST {VITE_API_BASE_URL}/scan  (multipart/form-data, field "image")
- *
- * Works whether VITE_API_BASE_URL is set to `http://localhost:8000/api/v1`
- * or `http://localhost:8000`. If VITE_API_BASE_URL is empty, a local mock
- * is used so the UI can still be demoed without the backend running.
  */
 
 import { scanProductImage } from './api.js'
 
-const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '')
-
-/** True when no backend is configured and results come from the local mock. */
+/** True when results come from the local mock rather than Backend/main.py. */
 export const USING_MOCK = false
 
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -48,17 +42,61 @@ const CONFIDENCE_MAP = {
   rendah: 60,
 }
 
+const FINDING_MAP = {
+  texture: 'texture',
+  text_logo: 'text',
+  text: 'text',
+  lighting: 'lighting',
+  metadata: 'metadata',
+}
+
+function clamp01(n) {
+  return Math.min(1, Math.max(0, n))
+}
+
+function parseAnomalyRegion(item) {
+  const rawBox = Array.isArray(item?.box)
+    ? item.box
+    : Array.isArray(item?.bbox)
+      ? item.bbox
+      : null
+  if (!rawBox || rawBox.length !== 4) return null
+
+  const nums = rawBox.map(Number)
+  if (!nums.every(Number.isFinite)) return null
+
+  // Support both 0–1000 integer scale and 0–1 normalised floats
+  const maxVal = Math.max(...nums)
+  const scale = maxVal > 1.0 ? 1000 : 1
+  const [ymin, xmin, ymax, xmax] = nums.map((v) => clamp01(v / scale))
+
+  const w = Math.max(0.04, Math.min(1 - xmin, xmax - xmin))
+  const h = Math.max(0.04, Math.min(1 - ymin, ymax - ymin))
+
+  return {
+    x: xmin,
+    y: ymin,
+    w,
+    h,
+    finding: FINDING_MAP[item?.finding] ?? 'texture',
+    score: typeof item?.score === 'number' ? item.score : undefined,
+  }
+}
+
 /**
  * Converts the `/api/v1/scan` payload from `Backend/main.py` into the
  * normalised result shape used across the front-end screens.
  */
 function normaliseBackendData(data) {
-  const probability =
+  const rawProb =
     typeof data.ai_probability === 'number'
-      ? Math.round(data.ai_probability)
-      : Math.round(
-          (data.is_ai_generated ? data.confidence_score : 1 - data.confidence_score) * 100,
-        )
+      ? data.ai_probability
+      : (data.is_ai_generated ? data.confidence_score : 1 - data.confidence_score) * 100
+  const probability = Math.min(100, Math.max(0, Math.round(rawProb)))
+
+  const threshold = typeof data.threshold === 'number' ? data.threshold : 50
+  const isAiGenerated =
+    typeof data.is_ai_generated === 'boolean' ? data.is_ai_generated : rawProb >= threshold
 
   let confidence
   if (typeof data.model_confidence === 'string') {
@@ -67,40 +105,40 @@ function normaliseBackendData(data) {
     confidence = Math.round(data.confidence_score * 100)
   }
 
-  // Convert anomalies `[ymin, xmin, ymax, xmax]` (0–1000 scale) into 0–1 regions
   const regions = Array.isArray(data.anomalies)
-    ? data.anomalies
-        .filter((a) => Array.isArray(a.box) && a.box.length === 4)
-        .map((a) => {
-          const [ymin, xmin, ymax, xmax] = a.box
-          const findingMap = { texture: 'texture', text_logo: 'text', lighting: 'lighting', metadata: 'metadata' }
-          return {
-            x: xmin / 1000,
-            y: ymin / 1000,
-            w: (xmax - xmin) / 1000,
-            h: (ymax - ymin) / 1000,
-            finding: findingMap[a.finding] ?? a.finding ?? 'texture',
-          }
-        })
-    : data.details?.regions ?? []
+    ? data.anomalies.map(parseAnomalyRegion).filter(Boolean)
+    : Array.isArray(data.details?.regions)
+      ? data.details.regions
+      : []
+
+  const heatmap =
+    typeof data.heatmap === 'string' && data.heatmap.startsWith('data:image/')
+      ? data.heatmap
+      : data.details?.heatmap ?? null
 
   const details = data.breakdown
-    ? { breakdown: data.breakdown, regions }
-    : { ...(data.details ?? deriveDetails(probability)), regions }
+    ? { breakdown: data.breakdown, regions, heatmap }
+    : { ...(data.details ?? deriveDetails(probability)), regions, heatmap }
 
   return {
     scanId: data.scan_id,
     probability,
-    isAiGenerated: probability >= 50,
+    isAiGenerated,
+    threshold,
+    classification: data.classification ?? null,
+    modelConfidence: data.model_confidence ?? null,
     confidence,
-    verdictText: data.verdict_text,
+    verdictText: data.verdict_text ?? null,
+    modelFile: data.model_file ?? null,
+    isFallbackModel: data.is_final_model === false,
+    modelWarning: data.model_warning ?? null,
     details,
   }
 }
 
 /**
  * @param {File} file
- * @returns {Promise<{ probability: number, isAiGenerated: boolean, confidence?: number, verdictText?: string, details?: object }>}
+ * @returns {Promise<{ probability: number, isAiGenerated: boolean, threshold: number, confidence?: number, modelConfidence?: string, verdictText?: string, details?: object }>}
  */
 export async function detectImage(file, { signal } = {}) {
   const data = await scanProductImage(file, { signal })
@@ -111,8 +149,7 @@ export async function detectImage(file, { signal } = {}) {
 }
 
 /**
- * Plausible evidence breakdown for a given probability (see lib/evidence.js
- * for the shape). Used by the mock and for seed scans saved without details.
+ * Plausible evidence breakdown for seed/demo scans saved without details.
  */
 export function deriveDetails(probability) {
   const regions = []
@@ -125,19 +162,6 @@ export function deriveDetails(probability) {
     lighting_consistency: probability >= 92 ? 'poor' : probability >= 45 && probability < 60 ? 'fair' : 'good',
     metadata_check: probability >= 50 ? 'no_camera_data' : 'camera_data_found',
     regions,
-  }
-}
-
-/** Development-only mock: deterministic score per file, with simulated latency. */
-async function mockDetect(file, signal) {
-  await delay(1600, signal)
-  let hash = 0
-  const key = `${file.name}:${file.size}`
-  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0
-  const probability = hash % 101
-  return {
-    probability,
-    isAiGenerated: probability >= 50,
-    details: deriveDetails(probability),
+    heatmap: null,
   }
 }

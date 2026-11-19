@@ -104,5 +104,7 @@ export function buildEvidence(result) {
     .filter((r) => [r.x, r.y, r.w, r.h].every(Number.isFinite))
     .map((r, i) => ({ ...r, id: `region-${i}` }))
 
-  return { findings, regions }
+  const heatmap = typeof details.heatmap === 'string' ? details.heatmap : null
+
+  return { findings, regions, heatmap }
 }

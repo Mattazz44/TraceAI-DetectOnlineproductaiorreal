@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronLeft, Home, Lightbulb, Package, Share2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Flame, Home, Lightbulb, Package, Share2 } from 'lucide-react'
 import Toast from './Toast.jsx'
 import { STATUS, buildEvidence } from '../lib/evidence.js'
 import { getVerdict } from '../lib/verdict.js'
@@ -10,8 +10,9 @@ import { shareOrCopy } from '../lib/share.js'
  * Responsive across mobile, tablet (iPad), and laptop/desktop.
  */
 export default function EvidenceScreen({ scan, onBack, onHome }) {
-  const { findings, regions } = buildEvidence(scan.result)
+  const { findings, regions, heatmap } = buildEvidence(scan.result)
   const [activeId, setActiveId] = useState(null) // id of expanded finding
+  const [showHeatmap, setShowHeatmap] = useState(true)
   const [toast, setToast] = useState(null)
   const [isSharing, setIsSharing] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -96,6 +97,9 @@ export default function EvidenceScreen({ scan, onBack, onHome }) {
               url={scan.url}
               name={scan.name}
               regions={regions}
+              heatmap={heatmap}
+              showHeatmap={showHeatmap}
+              onToggleHeatmap={() => setShowHeatmap((v) => !v)}
               activeId={activeId}
               findings={findings}
               onSelectRegion={focusFinding}
@@ -193,8 +197,19 @@ function ActionButtons({ copied, isSharing, onShare, onHome }) {
 
 /* ------------------------------------------------------------------ */
 
-function AnnotatedImage({ url, name, regions, activeId, findings, onSelectRegion }) {
+function AnnotatedImage({
+  url,
+  name,
+  regions,
+  heatmap,
+  showHeatmap,
+  onToggleHeatmap,
+  activeId,
+  findings,
+  onSelectRegion,
+}) {
   const titleOf = (id) => findings.find((f) => f.id === id)?.title
+  const hasAbnormalFinding = findings.some((f) => f.status === 'janggal' || f.status === 'ragu')
 
   const boxes = regions.map((r, i) => {
     const isActive = activeId && r.finding === activeId
@@ -235,13 +250,21 @@ function AnnotatedImage({ url, name, regions, activeId, findings, onSelectRegion
   return (
     <figure className="relative grid h-56 place-items-center overflow-hidden rounded-3xl bg-thumb sm:h-72 md:h-80 lg:h-[22rem]">
       {url ? (
-        // Wrapper shrinks to the rendered image so normalised boxes line up with it.
+        // Wrapper shrinks to the rendered image so normalised boxes & heatmap align with it.
         <div className="relative inline-block">
           <img
             src={url}
             alt={`Gambar ${name} dengan area janggal ditandai`}
             className="block max-h-56 w-auto max-w-full sm:max-h-72 md:max-h-80 lg:max-h-[22rem]"
           />
+          {heatmap && showHeatmap && (
+            <img
+              src={heatmap}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 size-full object-fill opacity-80"
+            />
+          )}
           {boxes}
         </div>
       ) : (
@@ -250,21 +273,52 @@ function AnnotatedImage({ url, name, regions, activeId, findings, onSelectRegion
           <div className="absolute inset-0 grid place-items-center" aria-hidden="true">
             <Package className="size-20 text-ink/[0.07]" strokeWidth={1.25} />
           </div>
+          {heatmap && showHeatmap && (
+            <img
+              src={heatmap}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 size-full object-fill opacity-75"
+            />
+          )}
           {boxes}
         </div>
       )}
 
-      <figcaption className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md bg-white px-2 py-1 text-xs font-semibold text-ink shadow-soft">
+      <figcaption className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md bg-white/95 px-2 py-1 text-xs font-semibold text-ink shadow-soft backdrop-blur-xs">
         {regions.length > 0 ? (
           <>
             <span className="size-2 rounded-[3px] border border-[#f0601e] bg-amber/60" aria-hidden="true" />
             Area janggal
             <span className="text-muted">· {regions.length}</span>
           </>
+        ) : hasAbnormalFinding ? (
+          <>
+            <span className="size-2 rounded-full bg-amber" aria-hidden="true" />
+            Indikasi global terdeteksi
+          </>
         ) : (
           'Tidak ada area janggal'
         )}
       </figcaption>
+
+      {heatmap && (
+        <button
+          type="button"
+          onClick={onToggleHeatmap}
+          aria-pressed={showHeatmap}
+          className={[
+            'absolute right-3 bottom-3 flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold shadow-soft transition',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
+            showHeatmap
+              ? 'bg-ink text-neon hover:bg-ink/90'
+              : 'bg-white/95 text-ink hover:bg-white',
+          ].join(' ')}
+        >
+          <Flame className="size-3.5" strokeWidth={2.25} aria-hidden="true" />
+          Heatmap
+        </button>
+      )}
     </figure>
   )
 }

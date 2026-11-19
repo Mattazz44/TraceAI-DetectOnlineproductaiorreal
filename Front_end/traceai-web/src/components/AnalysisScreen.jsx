@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { ChevronLeft, Loader2, ScanSearch } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Loader2, ScanSearch } from 'lucide-react'
 import { useCountUp } from '../hooks/useCountUp.js'
 import { getConfidence, getVerdict } from '../lib/verdict.js'
 
@@ -55,12 +55,24 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
               <>
                 <VerdictCard
                   probability={scan.result.probability}
+                  isAiGenerated={scan.result.isAiGenerated}
+                  threshold={scan.result.threshold}
                   verdictText={scan.result.verdictText}
                 />
                 <ConfidenceCard
                   probability={scan.result.probability}
                   confidence={scan.result.confidence}
+                  modelConfidence={scan.result.modelConfidence}
                 />
+                {scan.result.modelWarning && (
+                  <div
+                    role="status"
+                    className="flex items-start gap-2.5 rounded-2xl border border-amber/40 bg-amber/15 p-3.5 text-[13px] leading-relaxed text-ink animate-fade-in"
+                  >
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#b46900]" aria-hidden="true" />
+                    <span>{scan.result.modelWarning}</span>
+                  </div>
+                )}
               </>
             )}
 
@@ -191,9 +203,9 @@ function ScanningCards() {
   )
 }
 
-function VerdictCard({ probability, verdictText }) {
+function VerdictCard({ probability, isAiGenerated, threshold, verdictText }) {
   const value = useCountUp(probability)
-  const verdict = getVerdict(probability)
+  const verdict = getVerdict(probability, isAiGenerated, threshold)
   const text = verdictText || verdict.text
 
   return (
@@ -228,8 +240,8 @@ function VerdictCard({ probability, verdictText }) {
   )
 }
 
-function ConfidenceCard({ probability, confidence }) {
-  const { strength, level } = getConfidence(probability, confidence)
+function ConfidenceCard({ probability, confidence, modelConfidence }) {
+  const { strength, level } = getConfidence(probability, confidence, modelConfidence)
   const width = useCountUp(strength, 1100)
 
   return (

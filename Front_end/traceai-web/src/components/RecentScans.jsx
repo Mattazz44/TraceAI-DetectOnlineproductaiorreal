@@ -45,7 +45,7 @@ export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
                 <p className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink" title={scan.name}>
                   {scan.name}
                 </p>
-                <ScoreBadge probability={scan.probability} />
+                <ScoreBadge probability={scan.probability} isAiGenerated={scan.isAiGenerated} />
                 <ChevronRight
                   className="-ml-1 size-4 shrink-0 text-ink/25 transition group-hover:translate-x-0.5 group-hover:text-ink/50"
                   aria-hidden="true"

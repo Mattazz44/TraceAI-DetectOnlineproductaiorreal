@@ -27,5 +27,9 @@ export async function scanProductImage(imageFile, { signal } = {}) {
         throw new Error(result.detail || "Gagal memindai gambar di server.");
     }
 
+    if (result?.status !== "success" || !result?.data) {
+        throw new Error(result?.detail || "Respons server tidak valid.");
+    }
+
     return result.data;
 }

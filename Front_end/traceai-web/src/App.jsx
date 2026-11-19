@@ -134,6 +134,14 @@ export default function App() {
           id: key,
           name: file.name,
           probability: res.probability,
+          isAiGenerated: res.isAiGenerated,
+          threshold: res.threshold,
+          classification: res.classification ?? null,
+          modelConfidence: res.modelConfidence ?? null,
+          verdictText: res.verdictText ?? null,
+          modelFile: res.modelFile ?? null,
+          isFallbackModel: res.isFallbackModel ?? false,
+          modelWarning: res.modelWarning ?? null,
           confidence: res.confidence ?? null,
           details: res.details ?? null,
           thumbnail,
@@ -166,7 +174,17 @@ export default function App() {
         await delay(MIN_SCAN_MS, controller.signal)
         const result = {
           probability: scan.probability,
-          isAiGenerated: scan.probability >= 50,
+          isAiGenerated:
+            typeof scan.isAiGenerated === 'boolean'
+              ? scan.isAiGenerated
+              : scan.probability >= (scan.threshold ?? 50),
+          threshold: scan.threshold ?? 50,
+          classification: scan.classification ?? null,
+          modelConfidence: scan.modelConfidence ?? null,
+          verdictText: scan.verdictText ?? null,
+          modelFile: scan.modelFile ?? null,
+          isFallbackModel: scan.isFallbackModel ?? false,
+          modelWarning: scan.modelWarning ?? null,
           confidence: scan.confidence ?? undefined,
           // In mock mode, regenerate details so older saved scans get the latest evidence fields.
           details:
