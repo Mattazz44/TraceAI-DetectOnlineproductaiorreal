@@ -1,0 +1,31 @@
+{
+  "architecture": "EfficientNet-B0",
+  "best_epoch": 9,
+  "best_validation_loss": 0.013007790171659204,
+  "selected_threshold": 0.12,
+  "test_metrics": [
+    {
+      "evaluation": "threshold_0.50",
+      "accuracy": 0.9955516014234875,
+      "precision": 0.9956584659913169,
+      "recall": 0.9971014492753624,
+      "f1": 0.99637943519189,
+      "balanced_accuracy": 0.9950945034395244,
+      "roc_auc": 0.999545849195218
+    },
+    {
+      "evaluation": "selected_0.12",
+      "accuracy": 0.9955516014234875,
+      "precision": 0.9942279942279942,
+      "recall": 0.9985507246376811,
+      "f1": 0.9963846710050615,
+      "balanced_accuracy": 0.994667067387965,
+      "roc_auc": 0.999545849195218
+    }
+  ],
+  "dataset_sizes": {
+    "train": 4064,
+    "validation": 869,
+    "test": 1124
+  }
+}

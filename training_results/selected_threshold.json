@@ -1,0 +1,5 @@
+{
+  "threshold": 0.12,
+  "selection_basis": "Highest validation F1; tie-break by balanced accuracy",
+  "validation_f1": 0.9971883786316776
+}
