@@ -1,0 +1,26 @@
+{
+  "provider": "huggingface_swin",
+  "architecture": "swin_transformer",
+  "base_model_id": "Organika/sdxl-detector",
+  "model_dir": "swin_sdxl_finetuned",
+  "class_names": [
+    "NON_AI",
+    "AI_GENERATED"
+  ],
+  "image_size": 224,
+  "preprocessing": "center_crop_fit",
+  "normalization_mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "normalization_std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "threshold": 0.48,
+  "best_epoch": 4,
+  "best_val_loss": 0.1564033647208834,
+  "seed": 42
+}

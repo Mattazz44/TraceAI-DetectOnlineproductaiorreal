@@ -8,6 +8,8 @@ temp_uploads/
 *.pth
 *.onnx
 *.pt
+*.safetensors
+*.bin
 
 # Node / Frontend
 node_modules/

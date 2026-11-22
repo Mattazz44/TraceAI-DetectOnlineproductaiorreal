@@ -39,10 +39,11 @@ ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 # =====================================================================
-# 1. Muat Konfigurasi & Model ML (efficientnet_b0) Satu Kali Saat Startup
+# 1. Muat Konfigurasi & Model ML (Swin Transformer / EfficientNet-B0) Saat Startup
 # =====================================================================
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
+SWIN_MODEL_DIR = MODELS_DIR / "swin_sdxl_finetuned"
 
 # Pasangkan setiap file bobot dengan konfigurasi yang sesuai agar threshold & resolusi
 # tidak tertukar antara model _final (384px, threshold 0.12) dan _revised (224px).
@@ -91,7 +92,90 @@ def _extract_state_dict(checkpoint):
     return checkpoint
 
 
+def _build_transform(image_size: int, norm_mean: list[float], norm_std: list[float], preprocessing: str):
+    if preprocessing == "center_crop_fit":
+        resize_step = transforms.Lambda(
+            lambda img: ImageOps.fit(
+                img,
+                (image_size, image_size),
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.5),
+            )
+        )
+    else:
+        resize_step = transforms.Resize((image_size, image_size))
+
+    return transforms.Compose([
+        resize_step,
+        transforms.ToTensor(),
+        transforms.Normalize(mean=norm_mean, std=norm_std),
+    ])
+
+
 def load_traceai_model():
+    # Prioritas Utama: Model Fine-Tuned Swin Transformer (Hugging Face lokal)
+    if SWIN_MODEL_DIR.is_dir() and (
+        (SWIN_MODEL_DIR / "model.safetensors").is_file()
+        or (SWIN_MODEL_DIR / "pytorch_model.bin").is_file()
+    ):
+        from transformers import AutoModelForImageClassification
+
+        swin_config = {}
+        swin_config_path = SWIN_MODEL_DIR / "traceai_config_final.json"
+        if not swin_config_path.exists():
+            swin_config_path = MODELS_DIR / "traceai_config_final.json"
+        if swin_config_path.exists():
+            try:
+                with open(swin_config_path, "r", encoding="utf-8") as f:
+                    swin_config = json.load(f)
+            except Exception:
+                swin_config_path = None
+        else:
+            swin_config_path = None
+
+        model = AutoModelForImageClassification.from_pretrained(
+            str(SWIN_MODEL_DIR),
+            local_files_only=True,
+        )
+        model.to(DEVICE)
+        model.eval()
+        for param in model.parameters():
+            param.requires_grad_(False)
+
+        id2label = getattr(model.config, "id2label", None) or {0: "NON_AI", 1: "AI_GENERATED"}
+        class_names = list(
+            swin_config.get("class_names")
+            or [id2label[str(i)] if str(i) in id2label else id2label[i] for i in sorted(int(k) for k in id2label.keys())]
+        )
+        ai_index = next(
+            (i for i, name in enumerate(class_names) if "ai" in str(name).lower() and "non" not in str(name).lower()),
+            1,
+        )
+        non_ai_index = class_names.index("NON_AI") if "NON_AI" in class_names else (1 - ai_index)
+        image_size = int(swin_config.get("image_size") or 224)
+        norm_mean = [float(x) for x in (swin_config.get("normalization_mean") or [0.485, 0.456, 0.406])]
+        norm_std = [float(x) for x in (swin_config.get("normalization_std") or [0.229, 0.224, 0.225])]
+        threshold = float(swin_config.get("threshold") or 0.48)
+        preprocessing = str(swin_config.get("preprocessing") or "center_crop_fit").lower().strip()
+
+        return {
+            "model": model,
+            "provider": "huggingface_swin",
+            "architecture": "swin_transformer",
+            "preprocessing": preprocessing,
+            "model_file": SWIN_MODEL_DIR.name,
+            "config_file": swin_config_path.name if swin_config_path else None,
+            "is_final": True,
+            "model_warning": None,
+            "class_names": class_names,
+            "ai_index": ai_index,
+            "non_ai_index": non_ai_index,
+            "image_size": image_size,
+            "threshold": threshold,
+            "transform": _build_transform(image_size, norm_mean, norm_std, preprocessing),
+        }
+
+    # Fallback: File bobot model PyTorch EfficientNet-B0 (.pth)
     selected_profile = None
     checkpoint = None
     loaded_model_path = None
@@ -114,7 +198,7 @@ def load_traceai_model():
     if checkpoint is None or loaded_model_path is None or selected_profile is None:
         raise RuntimeError(
             "Gagal memuat bobot model: "
-            + ("; ".join(load_errors) if load_errors else "Tidak ada file .pth di Backend/models/.")
+            + ("; ".join(load_errors) if load_errors else "Tidak ada file model di Backend/models/.")
         )
 
     config = {}
@@ -166,6 +250,11 @@ def load_traceai_model():
         or config.get("threshold")
         or selected_profile["default_threshold"]
     )
+    preprocessing = str(
+        bundle_meta.get("preprocessing")
+        or config.get("preprocessing")
+        or "resize"
+    ).lower().strip()
 
     if "AI_GENERATED" not in class_names:
         raise ValueError(f"Kelas 'AI_GENERATED' tidak ditemukan di class_names: {class_names}")
@@ -189,23 +278,19 @@ def load_traceai_model():
     for param in model.parameters():
         param.requires_grad_(False)
 
-    preprocess_transform = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=norm_mean, std=norm_std),
-    ])
-
     model_warning = None
     if not selected_profile["is_final"]:
         model_warning = (
-            "File bobot final (traceai_efficientnet_b0_final.pth) belum ditemukan di Backend/models/. "
+            "File bobot final belum ditemukan di Backend/models/. "
             f"Server menggunakan model cadangan ({loaded_model_path.name}) yang akurasinya lebih sensitif terhadap foto terkompresi."
         )
         logger.warning(model_warning)
 
     return {
         "model": model,
+        "provider": "torchvision",
         "architecture": raw_arch,
+        "preprocessing": preprocessing,
         "model_file": loaded_model_path.name,
         "config_file": loaded_config_path.name if loaded_config_path else None,
         "is_final": selected_profile["is_final"],
@@ -215,7 +300,7 @@ def load_traceai_model():
         "non_ai_index": non_ai_index,
         "image_size": image_size,
         "threshold": threshold,
-        "transform": preprocess_transform,
+        "transform": _build_transform(image_size, norm_mean, norm_std, preprocessing),
     }
 
 
@@ -324,23 +409,42 @@ def predict_with_gradcam(pil_img: Image.Image) -> tuple[float, np.ndarray | None
     """
     Menjalankan inferensi model dan menghitung peta aktivasi Grad-CAM terhadap
     selisih logit (AI_GENERATED - NON_AI) agar area janggal tetap akurat meski softmax jenuh.
+    Mendukung baik Swin Transformer (Hugging Face) maupun EfficientNet-B0 (Torchvision).
     """
     input_tensor = preprocess_image(pil_img)
     model = MODEL_ARTIFACT["model"]
     ai_idx = MODEL_ARTIFACT["ai_index"]
     non_ai_idx = MODEL_ARTIFACT["non_ai_index"]
+    provider = MODEL_ARTIFACT.get("provider", "torchvision")
 
     with torch.enable_grad():
         x = input_tensor.detach().clone().requires_grad_(True)
-        feats = model.features(x)
-        pooled = model.avgpool(feats)
-        flat = torch.flatten(pooled, 1)
-        logits = model.classifier(flat)
-        probs = torch.softmax(logits, dim=1)
-        ai_score = float(round(probs[0, ai_idx].item() * 100.0, 2))
+        if provider == "huggingface_swin":
+            swin_out = model.swin(pixel_values=x)
+            seq_feats = swin_out.last_hidden_state  # (1, L, C), misal (1, 49, 1024)
+            pooled = seq_feats.transpose(1, 2).mean(dim=-1)
+            logits = model.classifier(pooled)
+            probs = torch.softmax(logits, dim=1)
+            ai_score = float(round(probs[0, ai_idx].item() * 100.0, 2))
 
-        target_logit = logits[0, ai_idx] - logits[0, non_ai_idx]
-        grads = torch.autograd.grad(target_logit, feats)[0]
+            target_logit = logits[0, ai_idx] - logits[0, non_ai_idx]
+            grads_seq = torch.autograd.grad(target_logit, seq_feats)[0]
+
+            num_tokens = seq_feats.shape[1]
+            channels = seq_feats.shape[2]
+            side = int(round(num_tokens ** 0.5))
+            feats = seq_feats.transpose(1, 2).reshape(1, channels, side, side)
+            grads = grads_seq.transpose(1, 2).reshape(1, channels, side, side)
+        else:
+            feats = model.features(x)
+            pooled = model.avgpool(feats)
+            flat = torch.flatten(pooled, 1)
+            logits = model.classifier(flat)
+            probs = torch.softmax(logits, dim=1)
+            ai_score = float(round(probs[0, ai_idx].item() * 100.0, 2))
+
+            target_logit = logits[0, ai_idx] - logits[0, non_ai_idx]
+            grads = torch.autograd.grad(target_logit, feats)[0]
 
     weights = grads.mean(dim=(2, 3), keepdim=True)
     cam = F.relu((weights * feats.detach()).sum(dim=1, keepdim=True))
@@ -361,7 +465,9 @@ def read_root():
     return {
         "status": "online",
         "message": "TraceAi API siap digunakan!",
+        "model_provider": MODEL_ARTIFACT.get("provider"),
         "model_architecture": MODEL_ARTIFACT["architecture"],
+        "preprocessing": MODEL_ARTIFACT.get("preprocessing"),
         "model_file": MODEL_ARTIFACT["model_file"],
         "config_file": MODEL_ARTIFACT["config_file"],
         "is_final_model": MODEL_ARTIFACT["is_final"],
