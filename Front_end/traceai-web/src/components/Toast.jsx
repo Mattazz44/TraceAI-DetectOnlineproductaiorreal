@@ -1,41 +1,55 @@
 import { useEffect } from 'react'
-import { Check, X } from 'lucide-react'
+import { AlertCircle, Check, X } from 'lucide-react'
 
-/** Small auto-dismissing toast, shown above the sticky bottom bar. */
-export default function Toast({ toast, onDismiss, duration = 2800 }) {
+export default function Toast({ toast, onDismiss, duration = 3200 }) {
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(onDismiss, duration)
-    return () => clearTimeout(t)
+    const timer = setTimeout(onDismiss, duration)
+    return () => clearTimeout(timer)
   }, [toast, onDismiss, duration])
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(10.5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-5"
+      className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
     >
       {toast && (
         <div
           key={toast.id}
-          className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-[0_12px_32px_-8px_rgb(20_22_18/0.5)] animate-rise"
+          className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border border-edge bg-card py-2.5 pr-2 pl-3.5 text-ink shadow-card animate-rise"
         >
           <span
-            className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full ${toast.tone === 'error' ? 'bg-alert' : 'bg-neon'} text-ink`}
+            className={[
+              'grid size-7 shrink-0 place-items-center rounded-lg border',
+              toast.tone === 'error'
+                ? 'border-ai-border bg-ai-bg text-ai-fg'
+                : 'border-safe-border bg-safe-bg text-safe-fg',
+            ].join(' ')}
+            aria-hidden="true"
           >
             {toast.tone === 'error' ? (
-              <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+              <AlertCircle className="size-4" strokeWidth={2.25} />
             ) : (
-              <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+              <Check className="size-4" strokeWidth={2.5} />
             )}
           </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">{toast.title}</p>
-            {toast.message && <p className="mt-0.5 text-[13px] text-white/65">{toast.message}</p>}
+
+          <div className="min-w-0 flex-1 py-0.5">
+            <p className="text-sm font-semibold text-ink">{toast.title}</p>
+            {toast.message && <p className="mt-0.5 text-xs leading-relaxed text-muted">{toast.message}</p>}
           </div>
+
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Tutup pemberitahuan"
+            className="grid size-11 shrink-0 place-items-center rounded-xl text-muted transition hover:bg-subtle hover:text-ink"
+          >
+            <X className="size-4" strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
       )}
     </div>
   )
 }
-

@@ -1,76 +1,89 @@
-import { AlertCircle } from 'lucide-react'
-import Header from './Header.jsx'
+import { AlertCircle, RotateCcw } from 'lucide-react'
 import Dropzone from './Dropzone.jsx'
 import RecentScans from './RecentScans.jsx'
 
 export default function HomeScreen({
+  staged,
   error,
   scans,
-  onFile,
+  onStageFile,
+  onStartScan,
+  onClearStaged,
   onTakePhoto,
   onPickGallery,
   onSelectScan,
   onOpenHistory,
 }) {
   return (
-    <div className="min-h-dvh pb-[max(2.5rem,env(safe-area-inset-bottom))] animate-fade-in">
-      <main className="mx-auto w-full max-w-md px-5 sm:max-w-xl sm:px-6 md:max-w-2xl lg:max-w-5xl lg:px-10 xl:max-w-6xl">
-        <Header onHistoryClick={onOpenHistory} />
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10 animate-fade-in">
+      <div className="max-w-3xl">
+        <h1 className="text-2xl leading-tight font-extrabold tracking-tight text-balance text-ink sm:text-3xl lg:text-[2.25rem]">
+          Periksa keaslian foto produk sebelum membeli atau mempublikasikan
+        </h1>
+        <p className="mt-2.5 text-sm leading-relaxed text-muted sm:text-base">
+          Unggah foto katalog, ulasan, atau iklan untuk mendeteksi jejak generator gambar sintetis,
+          meninjau area visual yang janggal, dan membaca metadata perangkat asli.
+        </p>
+      </div>
 
-        <div className="mt-3 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-10 xl:gap-12">
-          {/* Left column: Hero + Upload + Actions */}
-          <div className="lg:col-span-7">
-            <h1 className="mb-6 text-[2rem] leading-[1.12] font-extrabold tracking-tight text-balance text-ink sm:text-[2.5rem] lg:text-[2.75rem]">
-              Apakah Produk ini buatan AI atau asli?
-            </h1>
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:mt-8 lg:grid-cols-12 lg:gap-8">
+        <div className="space-y-4 lg:col-span-7">
+          <Dropzone
+            staged={staged}
+            onStageFile={onStageFile}
+            onStartScan={onStartScan}
+            onClearStaged={onClearStaged}
+            onPickGallery={onPickGallery}
+            onTakePhoto={onTakePhoto}
+          />
 
-            <Dropzone onFile={onFile} onBrowse={onPickGallery} />
-
-            {error && (
-              <div
-                role="alert"
-                className="mt-3 flex items-start gap-2.5 rounded-2xl border border-alert/30 bg-alert/10 px-4 py-3 text-sm text-ink animate-fade-in"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0 text-alert" aria-hidden="true" />
-                <span>{error}</span>
+          {error && (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-2xl border border-ai-border bg-ai-bg p-4 text-sm text-ai-fg sm:flex-row sm:items-center sm:justify-between animate-fade-in"
+            >
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="mt-0.5 size-4.5 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+                <span className="leading-relaxed font-medium">{error}</span>
               </div>
-            )}
 
-            {/* Actions */}
-            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3">
-              <button
-                type="button"
-                onClick={onTakePhoto}
-                className="h-14 cursor-pointer rounded-2xl bg-neon px-4 text-[15px] font-semibold text-ink shadow-[0_6px_20px_-8px] shadow-neon-strong transition hover:bg-neon-strong active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                Ambil foto
-              </button>
-              <button
-                type="button"
-                onClick={onPickGallery}
-                className="h-14 cursor-pointer rounded-2xl border-[1.5px] border-ink bg-white px-4 text-[15px] font-semibold text-ink transition hover:bg-canvas active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                Pilih dari galeri
-              </button>
+              {staged && (
+                <button
+                  type="button"
+                  onClick={onStartScan}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-ai-border bg-card px-3.5 text-xs font-semibold text-ink transition hover:bg-subtle"
+                >
+                  <RotateCcw className="size-3.5" strokeWidth={2} aria-hidden="true" />
+                  <span>Coba Lagi</span>
+                </button>
+              )}
             </div>
+          )}
 
-            <p className="mt-4 text-[13px] leading-relaxed text-muted sm:text-sm">
-              Tips: pakai gambar ukuran asli. Screenshot dan gambar yang sudah dikompres bisa
-              menurunkan akurasi.
+          <section
+            aria-labelledby="accuracy-note-heading"
+            className="rounded-2xl border border-line bg-subtle/60 p-4"
+          >
+            <h2 id="accuracy-note-heading" className="text-sm font-bold text-ink">
+              Panduan akurasi pemeriksaan
+            </h2>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted sm:text-[13px]">
+              Gunakan file gambar beresolusi asli bila tersedia. Tangkapan layar (screenshot) atau gambar
+              yang telah dikompresi berulang kali lewat aplikasi pesan dapat mengaburkan detail butiran
+              sensor kamera maupun menghapus informasi EXIF.
             </p>
-          </div>
-
-          {/* Right column on laptop/desktop: Recent scans panel */}
-          <div className="mt-7 lg:col-span-5 lg:mt-0 lg:rounded-3xl lg:border lg:border-line lg:bg-white/60 lg:p-6 lg:shadow-soft lg:backdrop-blur-sm">
-            <RecentScans
-              scans={scans}
-              limit={5}
-              onSelect={onSelectScan}
-              onSeeAll={onOpenHistory}
-            />
-          </div>
+          </section>
         </div>
-      </main>
+
+        <div className="lg:col-span-5">
+          <RecentScans
+            scans={scans}
+            limit={5}
+            onSelect={onSelectScan}
+            onSeeAll={onOpenHistory}
+          />
+        </div>
+      </div>
     </div>
   )
 }

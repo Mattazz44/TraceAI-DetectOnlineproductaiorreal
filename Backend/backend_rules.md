@@ -80,7 +80,14 @@ Menerima file gambar dan mengembalikan skor probabilitas beserta bukti temuan ya
     "classification": "AI tinggi",
     "model_confidence": "Tinggi",
     "verdict_text": "Gambar ini sangat mungkin hasil generator AI.",
-    "anomalies": [],
+    "anomalies": [
+      {
+        "box": [120, 80, 540, 480],
+        "label": "Area janggal",
+        "finding": "texture",
+        "score": 0.78
+      }
+    ],
     "breakdown": {
       "texture": {
         "status": "Janggal",

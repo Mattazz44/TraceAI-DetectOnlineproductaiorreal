@@ -1,10 +1,16 @@
 {
+  "provider": "huggingface_swin",
+  "architecture": "swin_transformer",
+  "version": "v6_product_matched_antiforgetting_fp16",
+  "base_model_id": "Organika/sdxl-detector",
+  "model_dir": "swin_sdxl_finetuned",
   "class_names": [
     "NON_AI",
     "AI_GENERATED"
   ],
-  "image_size": 384,
-  "architecture": "efficientnet_b0",
+  "image_size": 224,
+  "preprocessing": "center_crop_fit",
+  "tta": true,
   "normalization_mean": [
     0.485,
     0.456,
@@ -15,8 +21,8 @@
     0.224,
     0.225
   ],
-  "threshold": 0.12,
-  "best_epoch": 9,
-  "best_val_loss": 0.013007790171659204,
+  "threshold": 0.65,
+  "best_epoch": 3,
+  "best_val_loss": 0.1919347370990201,
   "seed": 42
 }

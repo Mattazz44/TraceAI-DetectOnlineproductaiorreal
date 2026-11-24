@@ -1,8 +1,18 @@
 /**
- * Creates a high-clarity JPEG data-URL (preserving aspect ratio, max 800px)
- * so recent scans can be persisted in localStorage and look sharp
- * both as a list thumbnail and in the full preview box when reopened.
+ * Reads natural pixel dimensions of an image File without uploading it,
+ * and creates a compact aspect-preserving JPEG thumbnail for local history.
  */
+export async function inspectImageDimensions(file) {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const dims = { width: bitmap.width, height: bitmap.height }
+    bitmap.close?.()
+    return dims
+  } catch {
+    return null
+  }
+}
+
 export async function createThumbnail(file, maxDim = 800) {
   try {
     const bitmap = await createImageBitmap(file)
@@ -26,7 +36,18 @@ export async function createThumbnail(file, maxDim = 800) {
 }
 
 export function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
+export function formatMimeShort(mime) {
+  if (!mime) return 'GAMBAR'
+  const map = {
+    'image/jpeg': 'JPG',
+    'image/png': 'PNG',
+    'image/webp': 'WEBP',
+  }
+  return map[mime.toLowerCase()] || mime.replace('image/', '').toUpperCase()
 }

@@ -1,276 +1,408 @@
 import { useEffect, useRef } from 'react'
-import { AlertTriangle, ChevronLeft, Loader2, ScanSearch } from 'lucide-react'
+import {
+  AlertTriangle,
+  ChevronLeft,
+  FileSearch,
+  Loader2,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react'
 import { useCountUp } from '../hooks/useCountUp.js'
+import { formatBytes } from '../lib/image.js'
 import { getConfidence, getVerdict } from '../lib/verdict.js'
 
-/**
- * Analysis screen. Responsive across mobile, tablet (iPad), and laptop/desktop.
- *
- * @param {{ name: string, url?: string|null, status: 'scanning'|'done', result?: object }} scan
- */
 export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence }) {
   const headingRef = useRef(null)
   const isScanning = scan.status === 'scanning'
 
-  // Move focus to the screen title for screen-reader users when the screen opens.
   useEffect(() => {
     window.scrollTo(0, 0)
     headingRef.current?.focus({ preventScroll: true })
   }, [])
 
+  const result = scan.result
+  const threshold = result?.threshold ?? 65
+  const verdict = result
+    ? getVerdict(result.probability, result.isAiGenerated, threshold)
+    : null
+
   return (
-    <div className="min-h-dvh animate-screen-in">
-      <main className="mx-auto w-full max-w-md px-5 pb-36 sm:max-w-xl sm:px-6 md:max-w-2xl lg:max-w-5xl lg:px-10 lg:pb-16 xl:max-w-6xl">
-        {/* Header bar */}
-        <header className="flex items-center gap-4 py-5">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 animate-fade-in">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-line bg-white text-ink shadow-soft transition hover:bg-canvas active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-            aria-label={isScanning ? 'Batalkan dan kembali' : 'Kembali'}
+            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
+            aria-label={isScanning ? 'Batalkan pemeriksaan dan kembali' : 'Kembali ke halaman sebelumnya'}
           >
-            <ChevronLeft className="size-5" strokeWidth={2.5} />
+            <ChevronLeft className="size-5" strokeWidth={2.25} aria-hidden="true" />
           </button>
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            className="min-w-0 truncate text-[15px] font-semibold text-ink outline-none sm:text-lg"
-            title={scan.name}
-          >
-            {scan.name}
-          </h1>
-        </header>
 
-        <div className="lg:mt-2 lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 xl:gap-10">
-          {/* Left column on laptop: Image preview */}
-          <div className="lg:col-span-7">
-            <PreviewBlock url={scan.url} name={scan.name} isScanning={isScanning} />
-          </div>
-
-          {/* Right column on laptop: Verdict + Confidence + Inline Desktop Actions */}
-          <div className="mt-4 space-y-3 lg:col-span-5 lg:mt-0 lg:space-y-4">
-            {isScanning ? (
-              <ScanningCards />
-            ) : (
-              <>
-                <VerdictCard
-                  probability={scan.result.probability}
-                  isAiGenerated={scan.result.isAiGenerated}
-                  threshold={scan.result.threshold}
-                  verdictText={scan.result.verdictText}
-                />
-                <ConfidenceCard
-                  probability={scan.result.probability}
-                  confidence={scan.result.confidence}
-                  modelConfidence={scan.result.modelConfidence}
-                />
-                {scan.result.modelWarning && (
-                  <div
-                    role="status"
-                    className="flex items-start gap-2.5 rounded-2xl border border-amber/40 bg-amber/15 p-3.5 text-[13px] leading-relaxed text-ink animate-fade-in"
-                  >
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#b46900]" aria-hidden="true" />
-                    <span>{scan.result.modelWarning}</span>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Inline action buttons on laptop/desktop */}
-            <div className="hidden pt-2 lg:grid lg:grid-cols-2 lg:gap-3">
-              <button
-                type="button"
-                onClick={onRescan}
-                className="h-14 cursor-pointer rounded-2xl border-[1.5px] border-ink bg-white px-4 text-[15px] font-semibold text-ink transition hover:bg-canvas active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                {isScanning ? 'Batalkan' : 'Scan lagi'}
-              </button>
-              <button
-                type="button"
-                disabled={isScanning}
-                onClick={onShowEvidence}
-                className="h-14 cursor-pointer rounded-2xl bg-neon px-4 text-[15px] font-bold text-ink shadow-[0_6px_20px_-8px] shadow-neon-strong transition hover:bg-neon-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                Lihat bukti
-              </button>
-            </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted">
+              {isScanning ? 'Memeriksa berkas gambar' : 'Ringkasan hasil pemeriksaan'}
+            </p>
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="truncate text-lg font-extrabold tracking-tight text-ink outline-none sm:text-xl"
+              title={scan.name}
+            >
+              {scan.name}
+            </h1>
           </div>
         </div>
-      </main>
 
-      {/* Sticky bottom actions on mobile & tablet */}
-      <nav
-        aria-label="Aksi hasil scan"
-        className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-canvas from-70% to-transparent pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:hidden"
-      >
-        <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-2.5 px-5 sm:max-w-xl sm:px-6 md:max-w-2xl">
-          <button
-            type="button"
-            onClick={onRescan}
-            className="h-14 cursor-pointer rounded-2xl border-[1.5px] border-ink bg-white px-4 text-[15px] font-semibold text-ink transition hover:bg-canvas active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-            {isScanning ? 'Batalkan' : 'Scan lagi'}
-          </button>
-          <button
-            type="button"
-            disabled={isScanning}
-            onClick={onShowEvidence}
-            className="h-14 cursor-pointer rounded-2xl bg-neon px-4 text-[15px] font-bold text-ink shadow-[0_6px_20px_-8px] shadow-neon-strong transition hover:bg-neon-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-            Lihat bukti
-          </button>
+        {verdict && (
+          <StatusPill verdict={verdict} />
+        )}
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
+        <div className="space-y-4 lg:col-span-7">
+          <PreviewViewport
+            url={scan.url}
+            name={scan.name}
+            dimensions={scan.dimensions || result?.details?.imageMeta}
+            isScanning={isScanning}
+          />
+
+          {!isScanning && result && (
+            <TechnicalSummaryCard
+              result={result}
+              fallbackDimensions={scan.dimensions}
+              fallbackSize={scan.fileSize}
+              fallbackFormat={scan.fileFormat}
+            />
+          )}
         </div>
-      </nav>
+
+        <div className="space-y-4 lg:col-span-5">
+          {isScanning ? (
+            <ScanningPanel onCancel={onRescan} />
+          ) : (
+            <>
+              <VerdictCard result={result} verdict={verdict} threshold={threshold} />
+              <ConfidenceCard result={result} threshold={threshold} />
+
+              {result.modelWarning && (
+                <div
+                  role="status"
+                  className="flex items-start gap-2.5 rounded-2xl border border-warn-border bg-warn-bg p-4 text-xs leading-relaxed text-warn-fg animate-fade-in"
+                >
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  <span>{result.modelWarning}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={onShowEvidence}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99]"
+                >
+                  <FileSearch className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+                  <span>Buka Bukti & Metadata</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onRescan}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
+                >
+                  <RotateCcw className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  <span>Periksa Gambar Baru</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
-/* ------------------------------------------------------------------ */
-
-function PreviewBlock({ url, name, isScanning }) {
+function StatusPill({ verdict }) {
+  const Icon = verdict.tone === 'safe' ? ShieldCheck : AlertTriangle
   return (
-    <div className="relative isolate grid h-56 place-items-center overflow-hidden rounded-3xl bg-thumb sm:h-72 md:h-80 lg:h-[26rem]">
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold ${verdict.pillClass}`}
+    >
+      <Icon className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+      <span>{verdict.badge}</span>
+    </span>
+  )
+}
+
+function PreviewViewport({ url, name, dimensions, isScanning }) {
+  return (
+    <div className="forensic-frame relative grid aspect-[16/10] w-full place-items-center overflow-hidden rounded-2xl border border-line bg-inset shadow-card">
       {url ? (
         <img
           src={url}
-          alt={`Pratinjau ${name}`}
-          className="absolute inset-0 -z-10 size-full object-contain p-2 sm:p-4"
+          alt={`Pratinjau pemeriksaan ${name}`}
+          width={dimensions?.width || 800}
+          height={dimensions?.height || 500}
+          fetchPriority="high"
+          className="max-h-full max-w-full object-contain p-3 sm:p-4"
         />
       ) : (
-        <span className="text-sm text-muted">[ Pratinjau gambar ]</span>
+        <p className="px-4 text-center text-sm text-muted">
+          Pratinjau gambar asli tidak tersimpan pada riwayat lama
+        </p>
       )}
 
-      {/* Laser overlay – fades out instead of disappearing abruptly */}
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${isScanning ? 'opacity-100' : 'opacity-0'}`}
-      >
-        <div className="absolute inset-0 bg-ink/10" />
-        {/* subtle grid to sell the "scanning" feel */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgb(20_22_18/0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgb(20_22_18/0.06)_1px,transparent_1px)] bg-[size:24px_24px]" />
-        {isScanning && (
-          <div className="absolute inset-x-0 animate-scan">
-            {/* glow trail */}
-            <div className="absolute inset-x-0 -top-10 h-10 bg-gradient-to-b from-transparent to-neon/35" />
-            {/* laser line */}
-            <div className="h-[3px] bg-neon shadow-[0_0_12px_3px] shadow-neon" />
+      {isScanning && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-ink/10" />
+          <div className="absolute inset-x-3 animate-scan">
+            <div className="h-0.5 bg-emerald-brand" />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function ScanningCards() {
-  return (
-    <>
-      <div
-        className="rounded-[1.75rem] bg-ink p-5 text-white sm:p-6"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="flex items-center gap-2 text-[13px] font-medium tracking-wide text-neon uppercase">
-          <ScanSearch className="size-4" strokeWidth={2.25} aria-hidden="true" />
-          Sedang memindai
-        </div>
-
-        <div className="mt-5 flex items-center gap-3">
-          <Loader2 className="size-6 animate-spin text-neon" strokeWidth={2.5} aria-hidden="true" />
-          <p className="animate-pulse text-lg font-semibold">Menganalisis gambar…</p>
-        </div>
-
-        {/* indeterminate bar */}
-        <div className="relative mt-5 h-2.5 overflow-hidden rounded-full bg-white/15">
-          <div className="absolute inset-y-0 w-1/3 rounded-full bg-neon/80 animate-indeterminate" />
-        </div>
-
-        <p className="mt-4 text-sm text-white/60">
-          Memeriksa tekstur, pencahayaan, dan metadata.
-        </p>
-      </div>
-
-      {/* Confidence card skeleton */}
-      <div className="rounded-2xl border border-line bg-white p-4 sm:p-5" aria-hidden="true">
-        <div className="flex items-center justify-between">
-          <div className="h-4 w-32 animate-pulse rounded bg-thumb" />
-          <div className="h-4 w-14 animate-pulse rounded bg-thumb" />
-        </div>
-        <div className="mt-3 h-2 animate-pulse rounded-full bg-thumb" />
-        <div className="mt-3 h-3 w-full animate-pulse rounded bg-thumb/70" />
-        <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-thumb/70" />
-      </div>
-    </>
-  )
-}
-
-function VerdictCard({ probability, isAiGenerated, threshold, verdictText }) {
-  const value = useCountUp(probability)
-  const verdict = getVerdict(probability, isAiGenerated, threshold)
-  const text = verdictText || verdict.text
-
+function ScanningPanel({ onCancel }) {
   return (
     <section
-      aria-labelledby="verdict-label"
-      className="rounded-[1.75rem] bg-ink p-5 text-white shadow-[0_12px_32px_-12px_rgb(20_22_18/0.5)] animate-rise sm:p-6"
+      aria-labelledby="scanning-heading"
+      role="status"
+      aria-live="polite"
+      className="rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6"
     >
-      <h2 id="verdict-label" className="text-[13px] font-medium tracking-wide text-neon uppercase">
-        Kemungkinan buatan AI
-      </h2>
-
-      <p className="mt-1 flex items-baseline" aria-label={`${probability} persen`}>
-        <span className="text-[5.5rem] leading-[0.95] font-extrabold tracking-tighter tabular-nums">
-          {value}
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-safe-border bg-safe-bg text-safe-fg">
+          <Loader2 className="size-5 animate-spin" strokeWidth={2.25} aria-hidden="true" />
         </span>
-        <span className="ml-2 text-3xl font-bold">%</span>
-      </p>
-
-      <div
-        className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/15"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={probability}
-        aria-label="Kemungkinan buatan AI"
-      >
-        <div className={`h-full rounded-full ${verdict.barClass}`} style={{ width: `${value}%` }} />
+        <div>
+          <h2 id="scanning-heading" className="text-base font-bold text-ink">
+            Menganalisis struktur gambar
+          </h2>
+          <p className="text-xs text-muted">Mohon tunggu, inferensi model sedang berjalan</p>
+        </div>
       </div>
 
-      <p className="mt-4 text-[17px] leading-snug font-semibold text-balance">{text}</p>
+      <ol className="mt-5 space-y-2.5 border-t border-line pt-4 text-xs text-muted sm:text-[13px]">
+        <li className="flex items-center gap-2.5 text-ink font-medium">
+          <span className="size-2 rounded-full bg-emerald-brand" aria-hidden="true" />
+          <span>Menyesuaikan bidang tengah gambar (224x224 center-crop)</span>
+        </li>
+        <li className="flex items-center gap-2.5 text-ink font-medium">
+          <span className="size-2 rounded-full bg-emerald-brand" aria-hidden="true" />
+          <span>Menghitung probabilitas Swin Transformer dua arah (TTA)</span>
+        </li>
+        <li className="flex items-center gap-2.5">
+          <span className="size-2 rounded-full bg-edge" aria-hidden="true" />
+          <span>Menyusun peta aktivasi Grad-CAM dan membaca atribut EXIF</span>
+        </li>
+      </ol>
+
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-edge bg-subtle px-4 text-sm font-semibold text-ink transition hover:bg-inset"
+      >
+        Batalkan Pemeriksaan
+      </button>
     </section>
   )
 }
 
-function ConfidenceCard({ probability, confidence, modelConfidence }) {
-  const { strength, level } = getConfidence(probability, confidence, modelConfidence)
-  const width = useCountUp(strength, 1100)
+function VerdictCard({ result, verdict, threshold }) {
+  const animatedProb = useCountUp(result.probability)
+  const exactAi =
+    typeof result.exactAiProb === 'number' ? result.exactAiProb.toFixed(1) : `${result.probability}.0`
+  const exactNonAi =
+    typeof result.exactNonAiProb === 'number'
+      ? result.exactNonAiProb.toFixed(1)
+      : (100 - Number(exactAi)).toFixed(1)
+  const summaryText = result.verdictText || verdict.text
+  const Icon = verdict.tone === 'safe' ? ShieldCheck : AlertTriangle
 
   return (
     <section
-      aria-labelledby="confidence-label"
-      className="rounded-2xl border border-line bg-white p-4 shadow-soft animate-rise [animation-delay:90ms] sm:p-5"
+      aria-labelledby="verdict-heading"
+      className="rounded-2xl border border-line bg-card p-5 shadow-card animate-rise sm:p-6"
     >
-      <div className="flex items-center justify-between">
-        <h2 id="confidence-label" className="text-[15px] font-semibold text-ink">
-          Keyakinan model
+      <div className="flex items-start gap-3">
+        <span
+          className={`mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl border ${verdict.pillClass}`}
+          aria-hidden="true"
+        >
+          <Icon className="size-5" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-muted">Kesimpulan Pemeriksaan</p>
+          <h2 id="verdict-heading" className="mt-0.5 text-xl leading-snug font-extrabold text-ink">
+            {verdict.headline}
+          </h2>
+        </div>
+      </div>
+
+      <p className="mt-3.5 text-sm leading-relaxed text-muted">{summaryText}</p>
+
+      <div className="mt-5 rounded-xl border border-line bg-subtle/60 p-4">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium text-muted">Skor Indikasi Buatan AI</p>
+            <p className="mt-0.5 flex items-baseline gap-1 font-mono text-3xl font-bold tabular-nums text-ink">
+              <span>{animatedProb}%</span>
+              <span className="text-xs font-normal text-muted">({exactAi}%)</span>
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-xs font-medium text-muted">Skor Keaslian Foto</p>
+            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
+              {exactNonAi}%
+            </p>
+          </div>
+        </div>
+
+        <div className="relative mt-4 pt-1">
+          <div
+            className="h-3 w-full overflow-hidden rounded-full bg-inset"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={result.probability}
+            aria-label={`Skor indikasi buatan AI ${result.probability} persen, ambang deteksi ${threshold} persen`}
+          >
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${verdict.barClass}`}
+              style={{ width: `${animatedProb}%` }}
+            />
+          </div>
+
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 bottom-0 flex flex-col items-center"
+            style={{ left: `${Math.min(96, Math.max(4, threshold))}%` }}
+          >
+            <span className="h-5 w-0.5 -translate-x-1/2 bg-ink" />
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between font-mono text-[11px] text-muted">
+          <span>0% Asli</span>
+          <span className="font-semibold text-ink">Ambang AI: {Math.round(threshold)}%</span>
+          <span>100% AI</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ConfidenceCard({ result, threshold }) {
+  const { percent, level } = getConfidence(
+    result.probability,
+    result.confidencePercent,
+    result.modelConfidence,
+    threshold,
+  )
+  const animatedWidth = useCountUp(percent, 800)
+
+  return (
+    <section
+      aria-labelledby="confidence-heading"
+      className="rounded-2xl border border-line bg-card p-4 shadow-card animate-rise sm:p-5"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="confidence-heading" className="text-sm font-bold text-ink">
+          Keyakinan Keputusan Model
         </h2>
-        <span className="text-[15px] text-muted">{level}</span>
+        <span className="font-mono text-xs font-semibold text-ink">
+          {level} ({percent}%)
+        </span>
       </div>
 
       <div
-        className="mt-2 h-2 overflow-hidden rounded-full bg-thumb"
+        className="mt-2.5 h-2 overflow-hidden rounded-full bg-inset"
         role="progressbar"
-        aria-valuemin={0}
+        aria-valuemin={50}
         aria-valuemax={100}
-        aria-valuenow={strength}
-        aria-valuetext={level}
-        aria-labelledby="confidence-label"
+        aria-valuenow={percent}
+        aria-valuetext={`${level}, ${percent} persen`}
+        aria-labelledby="confidence-heading"
       >
-        <div className="h-full rounded-full bg-ink" style={{ width: `${width}%` }} />
+        <div
+          className="h-full rounded-full bg-action transition-all duration-500"
+          style={{ width: `${animatedWidth}%` }}
+        />
       </div>
 
-      <p className="mt-3 text-[13px] leading-relaxed text-muted">
-        Detektor bisa meleset pada gambar terkompresi atau dari generator baru.
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">
+        Semakin jauh skor gambar dari ambang {Math.round(threshold)}%, semakin tegas pemisahan kelas
+        antara foto kamera dan gambar sintetis.
       </p>
+    </section>
+  )
+}
+
+function TechnicalSummaryCard({ result, fallbackDimensions, fallbackSize, fallbackFormat }) {
+  const imageMeta = result.details?.imageMeta
+  const modelInfo = result.details?.modelInfo
+
+  const width = imageMeta?.width || fallbackDimensions?.width
+  const height = imageMeta?.height || fallbackDimensions?.height
+  const resolution = width && height ? `${width} x ${height} px` : 'Tidak tercatat'
+
+  const formatLabel = imageMeta?.format || fallbackFormat || 'Gambar'
+  const byteSize = imageMeta?.file_size_bytes ?? fallbackSize
+  const sizeLabel = byteSize ? `${formatLabel} · ${formatBytes(byteSize)}` : formatLabel
+
+  const exifStatus =
+    imageMeta == null
+      ? 'Lihat tab metadata'
+      : imageMeta.has_exif
+        ? [imageMeta.camera_make, imageMeta.camera_model].filter(Boolean).join(' ') || 'EXIF tersedia'
+        : 'Tidak ditemukan EXIF'
+
+  const engineLabel = modelInfo
+    ? `${modelInfo.architecture === 'swin_transformer' ? 'Swin Transformer' : modelInfo.architecture}${modelInfo.tta ? ' · TTA 2x' : ''}`
+    : 'Swin Transformer'
+
+  return (
+    <section
+      aria-labelledby="tech-summary-heading"
+      className="rounded-2xl border border-line bg-card p-4 shadow-card sm:p-5"
+    >
+      <h2 id="tech-summary-heading" className="text-sm font-bold text-ink">
+        Ringkasan Teknis File & Mesin
+      </h2>
+
+      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-line bg-subtle/50 p-3">
+          <dt className="text-[11px] font-medium text-muted">Resolusi</dt>
+          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={resolution}>
+            {resolution}
+          </dd>
+        </div>
+
+        <div className="rounded-xl border border-line bg-subtle/50 p-3">
+          <dt className="text-[11px] font-medium text-muted">Format & Ukuran</dt>
+          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={sizeLabel}>
+            {sizeLabel}
+          </dd>
+        </div>
+
+        <div className="rounded-xl border border-line bg-subtle/50 p-3">
+          <dt className="text-[11px] font-medium text-muted">Metadata Kamera</dt>
+          <dd className="mt-1 truncate text-xs font-semibold text-ink" title={exifStatus}>
+            {exifStatus}
+          </dd>
+        </div>
+
+        <div className="rounded-xl border border-line bg-subtle/50 p-3">
+          <dt className="text-[11px] font-medium text-muted">Mesin Inferensi</dt>
+          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={engineLabel}>
+            {engineLabel}
+          </dd>
+        </div>
+      </dl>
     </section>
   )
 }

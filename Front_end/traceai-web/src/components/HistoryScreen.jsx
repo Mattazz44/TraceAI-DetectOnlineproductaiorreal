@@ -1,19 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, ChevronLeft, ChevronRight, History, Search, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  History,
+  ImageIcon,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react'
 import ScanThumb from './ScanThumb.jsx'
 import ScoreBadge from './ScoreBadge.jsx'
 
-const isFlagged = (s) =>
-  typeof s.isAiGenerated === 'boolean' ? s.isAiGenerated : s.probability >= 50
+function isFlaggedScan(scan) {
+  const threshold = scan.threshold ?? 65
+  return typeof scan.isAiGenerated === 'boolean'
+    ? scan.isAiGenerated
+    : scan.probability >= threshold
+}
 
 const FILTERS = [
   { id: 'all', label: 'Semua', test: () => true },
-  { id: 'high', label: 'AI tinggi', test: (s) => isFlagged(s) },
-  { id: 'low', label: 'AI rendah', test: (s) => !isFlagged(s) },
+  { id: 'ai', label: 'Terdeteksi AI', test: (s) => isFlaggedScan(s) },
+  { id: 'safe', label: 'Gambar Asli', test: (s) => !isFlaggedScan(s) },
 ]
 
 const timeFmt = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' })
-const dateFmt = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+const dateFmt = new Intl.DateTimeFormat('id-ID', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
 const weekdayFmt = new Intl.DateTimeFormat('id-ID', { weekday: 'long' })
 
 function startOfDay(ts) {
@@ -22,7 +40,6 @@ function startOfDay(ts) {
   return d.getTime()
 }
 
-/** Groups scans by calendar day, newest first. Scans without a timestamp go last. */
 function groupByDay(scans) {
   const today = startOfDay(Date.now())
   const DAY = 86_400_000
@@ -50,210 +67,416 @@ function groupByDay(scans) {
   return [...groups.values()]
 }
 
-/** "Riwayat scan" — searchable, filterable list of all past scans grouped by day. */
-export default function HistoryScreen({ scans, onBack, onNewScan, onSelectScan }) {
+export default function HistoryScreen({
+  scans,
+  onBack,
+  onNewScan,
+  onSelectScan,
+  onRemoveScan,
+  onClearScans,
+}) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [viewMode, setViewMode] = useState('list')
+  const [confirmClear, setConfirmClear] = useState(false)
+
   const headingRef = useRef(null)
   const searchRef = useRef(null)
 
   useEffect(() => {
+    window.scrollTo(0, 0)
     headingRef.current?.focus({ preventScroll: true })
   }, [])
 
+  useEffect(() => {
+    if (!confirmClear) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setConfirmClear(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmClear])
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const test = FILTERS.find((f) => f.id === filter).test
-    return groupByDay(scans.filter((s) => test(s) && (!q || s.name.toLowerCase().includes(q))))
+    const activeFilter = FILTERS.find((f) => f.id === filter) ?? FILTERS[0]
+    return groupByDay(
+      scans.filter((s) => activeFilter.test(s) && (!q || s.name.toLowerCase().includes(q))),
+    )
   }, [scans, query, filter])
 
-  const resultCount = groups.reduce((n, g) => n + g.items.length, 0)
+  const resultCount = groups.reduce((total, g) => total + g.items.length, 0)
+
+  const handleResetFilters = () => {
+    setQuery('')
+    setFilter('all')
+    searchRef.current?.focus()
+  }
 
   return (
-    <div className="min-h-dvh animate-screen-in">
-      <main className="mx-auto w-full max-w-md px-5 pb-32 sm:max-w-xl sm:px-6 md:max-w-3xl lg:max-w-5xl lg:px-10 lg:pb-16 xl:max-w-6xl">
-        {/* Header */}
-        <header className="flex items-center gap-4 py-5">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 animate-fade-in">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-line bg-white text-ink shadow-soft transition hover:bg-canvas active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-            aria-label="Kembali ke beranda"
+            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
+            aria-label="Kembali ke halaman pemeriksaan"
           >
-            <ChevronLeft className="size-5" strokeWidth={2.5} />
+            <ChevronLeft className="size-5" strokeWidth={2.25} aria-hidden="true" />
           </button>
-          <div className="min-w-0 flex-1">
+
+          <div>
             <h1
               ref={headingRef}
               tabIndex={-1}
-              className="text-xl font-bold tracking-tight text-ink outline-none sm:text-2xl"
+              className="text-xl font-extrabold tracking-tight text-ink outline-none sm:text-2xl"
             >
-              Riwayat scan
+              Riwayat Pemeriksaan
             </h1>
+            <p className="text-xs text-muted">
+              {scans.length} laporan tersimpan di peramban perangkat ini
+            </p>
           </div>
-          <span className="text-sm font-medium text-muted">{scans.length} scan</span>
-          <button
-            type="button"
-            onClick={onNewScan}
-            className="hidden h-11 cursor-pointer items-center gap-2 rounded-xl bg-neon px-4 text-sm font-bold text-ink shadow-[0_6px_20px_-8px] shadow-neon-strong transition hover:bg-neon-strong active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink lg:inline-flex"
-          >
-            <Camera className="size-4.5" strokeWidth={2.25} aria-hidden="true" />
-            Scan produk baru
-          </button>
-        </header>
+        </div>
 
-        <p className="text-sm text-muted">Telusuri kembali hasil scan produkmu.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {scans.length > 0 && !confirmClear && (
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 text-xs font-semibold text-muted transition hover:border-ai-border hover:bg-ai-bg hover:text-ai-fg"
+            >
+              <Trash2 className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+              <span>Hapus Semua</span>
+            </button>
+          )}
 
-        {/* Search + Filter toolbar (side-by-side on tablet/laptop) */}
-        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-4 size-4.5 -translate-y-1/2 text-ink/60"
-              strokeWidth={2.25}
-              aria-hidden="true"
-            />
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari nama produk atau file"
-              aria-label="Cari nama produk atau file"
-              className="h-12 w-full rounded-2xl border border-line bg-white pr-11 pl-11 text-[15px] text-ink shadow-soft transition outline-none placeholder:text-muted/80 focus:border-ink/40 focus:ring-4 focus:ring-ink/5 [&::-webkit-search-cancel-button]:hidden"
-            />
-            {query && (
+          {confirmClear && (
+            <div
+              role="group"
+              aria-label="Konfirmasi hapus seluruh riwayat"
+              className="flex items-center gap-1.5 rounded-xl border border-ai-border bg-ai-bg p-1"
+            >
               <button
                 type="button"
                 onClick={() => {
-                  setQuery('')
-                  searchRef.current?.focus()
+                  onClearScans()
+                  setConfirmClear(false)
                 }}
-                className="absolute top-1/2 right-3 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
-                aria-label="Hapus pencarian"
+                className="min-h-11 rounded-lg bg-ai-bar px-3 text-xs font-bold text-white transition hover:opacity-90"
               >
-                <X className="size-4" strokeWidth={2.5} />
+                Ya, Hapus Semua
               </button>
-            )}
-          </div>
-
-          {/* Filter chips */}
-          <div
-            className="grid grid-cols-3 gap-2 md:w-80 md:shrink-0"
-            role="radiogroup"
-            aria-label="Filter hasil"
-          >
-            {FILTERS.map((f) => {
-              const active = filter === f.id
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setFilter(f.id)}
-                  className={[
-                    'h-10 cursor-pointer rounded-xl border text-sm font-semibold transition active:scale-[0.97] md:h-12',
-                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
-                    active
-                      ? 'border-neon bg-neon text-ink'
-                      : 'border-line bg-white text-ink hover:border-ink/25',
-                  ].join(' ')}
-                >
-                  {f.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <p className="mt-3 text-[13px] text-muted">Persentase menunjukkan kemungkinan buatan AI.</p>
-
-        {/* List */}
-        <div className="mt-4 space-y-6" aria-live="polite">
-          {scans.length === 0 ? (
-            <EmptyState
-              title="Belum ada riwayat"
-              message="Hasil scan akan tersimpan di sini."
-            />
-          ) : resultCount === 0 ? (
-            <EmptyState
-              title="Tidak ada hasil"
-              message={query ? `Tidak ada file yang cocok dengan "${query.trim()}".` : 'Tidak ada scan untuk filter ini.'}
-            />
-          ) : (
-            groups.map((group) => (
-              <section key={group.key} aria-label={group.label}>
-                <div className="mb-2.5 flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold text-ink/75">{group.label}</h2>
-                  {group.date && <span className="text-[13px] text-muted">{group.date}</span>}
-                </div>
-                <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3">
-                  {group.items.map((scan) => (
-                    <li key={scan.id} className="animate-fade-in">
-                      <HistoryRow scan={scan} onSelect={() => onSelectScan(scan)} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="min-h-11 rounded-lg bg-card px-3 text-xs font-semibold text-ink transition hover:bg-subtle"
+              >
+                Batal
+              </button>
+            </div>
           )}
-        </div>
-      </main>
 
-      {/* Sticky CTA on mobile & tablet */}
-      <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-canvas from-70% to-transparent pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:hidden">
-        <div className="mx-auto w-full max-w-md px-5 sm:max-w-xl sm:px-6 md:max-w-3xl">
           <button
             type="button"
             onClick={onNewScan}
-            className="flex h-14 w-full cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-neon px-4 text-base font-bold text-ink shadow-[0_6px_20px_-8px] shadow-neon-strong transition hover:bg-neon-strong active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-brand px-4 text-xs font-semibold text-white transition hover:bg-emerald-brand-hover sm:text-sm"
           >
-            <Camera className="size-5" strokeWidth={2.25} aria-hidden="true" />
-            Scan produk baru
+            <Plus className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+            <span>Periksa Gambar Baru</span>
           </button>
         </div>
+      </div>
+
+      {scans.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-line bg-card p-4 shadow-card">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex-1">
+              <label
+                htmlFor="history-search-input"
+                className="mb-1.5 block text-xs font-semibold text-ink"
+              >
+                Cari nama berkas
+              </label>
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+                <input
+                  id="history-search-input"
+                  ref={searchRef}
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Ketik nama produk atau berkas..."
+                  className="h-11 w-full rounded-xl border border-line bg-subtle/50 pr-11 pl-10 text-sm text-ink transition outline-none placeholder:text-muted focus:border-edge focus:bg-card [&::-webkit-search-cancel-button]:hidden"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('')
+                      searchRef.current?.focus()
+                    }}
+                    aria-label="Bersihkan kata kunci pencarian"
+                    className="absolute top-1/2 right-0 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-muted transition hover:text-ink"
+                  >
+                    <X className="size-4" strokeWidth={2} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
+              <div
+                role="group"
+                aria-label="Filter status deteksi"
+                className="inline-flex rounded-xl border border-line bg-subtle p-1"
+              >
+                {FILTERS.map((item) => {
+                  const active = filter === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setFilter(item.id)}
+                      className={[
+                        'min-h-11 rounded-lg px-3 text-xs font-semibold transition',
+                        active
+                          ? 'bg-card text-ink shadow-card'
+                          : 'text-muted hover:text-ink',
+                      ].join(' ')}
+                    >
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div
+                role="group"
+                aria-label="Tata letak daftar riwayat"
+                className="inline-flex rounded-xl border border-line bg-subtle p-1"
+              >
+                <button
+                  type="button"
+                  aria-pressed={viewMode === 'list'}
+                  aria-label="Tampilan daftar"
+                  onClick={() => setViewMode('list')}
+                  className={[
+                    'grid size-11 place-items-center rounded-lg transition',
+                    viewMode === 'list' ? 'bg-card text-ink shadow-card' : 'text-muted hover:text-ink',
+                  ].join(' ')}
+                >
+                  <List className="size-4" strokeWidth={2} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={viewMode === 'grid'}
+                  aria-label="Tampilan grid kartu"
+                  onClick={() => setViewMode('grid')}
+                  className={[
+                    'grid size-11 place-items-center rounded-lg transition',
+                    viewMode === 'grid' ? 'bg-card text-ink shadow-card' : 'text-muted hover:text-ink',
+                  ].join(' ')}
+                >
+                  <LayoutGrid className="size-4" strokeWidth={2} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 space-y-6" aria-live="polite">
+        {scans.length === 0 ? (
+          <EmptyState
+            title="Belum ada riwayat pemeriksaan"
+            message="Setiap foto produk yang selesai Anda periksa akan tersimpan otomatis di halaman ini beserta skor dan rincian buktinya."
+            actionLabel="Mulai Pemeriksaan Pertama"
+            onAction={onNewScan}
+          />
+        ) : resultCount === 0 ? (
+          <EmptyState
+            title="Tidak ada hasil yang cocok"
+            message={
+              query
+                ? `Tidak ditemukan berkas dengan kata kunci "${query.trim()}" pada filter saat ini.`
+                : 'Belum ada pemeriksaan yang masuk ke dalam kategori filter ini.'
+            }
+            actionLabel="Reset Pencarian & Filter"
+            onAction={handleResetFilters}
+          />
+        ) : (
+          groups.map((group) => (
+            <section key={group.key} aria-labelledby={`group-${group.key}`}>
+              <div className="mb-3 flex items-baseline justify-between border-b border-line pb-1.5">
+                <h2 id={`group-${group.key}`} className="text-sm font-bold text-ink">
+                  {group.label}
+                </h2>
+                {group.date && <span className="font-mono text-xs text-muted">{group.date}</span>}
+              </div>
+
+              {viewMode === 'grid' ? (
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.items.map((scan) => (
+                    <li key={scan.id}>
+                      <HistoryGridCard
+                        scan={scan}
+                        onSelect={() => onSelectScan(scan)}
+                        onRemove={() => onRemoveScan(scan.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ul className="space-y-2.5">
+                  {group.items.map((scan) => (
+                    <li key={scan.id}>
+                      <HistoryListRow
+                        scan={scan}
+                        onSelect={() => onSelectScan(scan)}
+                        onRemove={() => onRemoveScan(scan.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))
+        )}
       </div>
     </div>
   )
 }
 
-function HistoryRow({ scan, onSelect }) {
-  const flagged = isFlagged(scan)
-  const level = scan.probability >= 75 ? 'AI tinggi' : flagged ? 'AI sedang' : 'AI rendah'
-  const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : null
+function HistoryListRow({ scan, onSelect, onRemove }) {
+  const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : 'Waktu tidak tercatat'
+  const meta = scan.details?.imageMeta
+  const subline =
+    meta?.width && meta?.height
+      ? `${time} · ${meta.width}x${meta.height} px`
+      : time
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="group flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-line bg-white p-2.5 pr-3 text-left shadow-soft transition hover:border-ink/20 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-      aria-label={`Buka hasil ${scan.name}, ${scan.probability} persen kemungkinan buatan AI`}
-    >
-      <ScanThumb scan={scan} size="lg" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold text-ink" title={scan.name}>
-          {scan.name}
-        </p>
-        <p className="mt-0.5 text-[13px] text-muted">
-          {time ? `${time} · ${level}` : level}
-        </p>
-      </div>
-      <ScoreBadge probability={scan.probability} isAiGenerated={scan.isAiGenerated} />
-      <ChevronRight
-        className="size-4.5 shrink-0 text-ink/40 transition group-hover:translate-x-0.5 group-hover:text-ink/70"
-        strokeWidth={2.25}
-        aria-hidden="true"
-      />
-    </button>
+    <div className="flex items-center gap-2 rounded-2xl border border-line bg-card p-2.5 shadow-card transition hover:border-edge">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 items-center gap-3.5 rounded-xl p-1 text-left"
+        aria-label={`Buka laporan ${scan.name}, skor AI ${scan.probability} persen`}
+      >
+        <ScanThumb scan={scan} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-ink sm:text-[15px]" title={scan.name}>
+            {scan.name}
+          </p>
+          <p className="mt-0.5 font-mono text-xs text-muted">{subline}</p>
+        </div>
+        <ScoreBadge
+          probability={scan.probability}
+          isAiGenerated={scan.isAiGenerated}
+          threshold={scan.threshold ?? 65}
+        />
+      </button>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Hapus ${scan.name} dari riwayat`}
+        className="grid size-11 shrink-0 place-items-center rounded-xl text-muted transition hover:bg-ai-bg hover:text-ai-fg"
+      >
+        <Trash2 className="size-4" strokeWidth={2} aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 
-function EmptyState({ title, message }) {
+function HistoryGridCard({ scan, onSelect, onRemove }) {
+  const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : 'Waktu tidak tercatat'
+  const meta = scan.details?.imageMeta
+  const subline =
+    meta?.width && meta?.height
+      ? `${time} · ${meta.width}x${meta.height} px`
+      : time
+
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-white/50 px-6 py-10 text-center">
-      <History className="size-8 text-ink/25" strokeWidth={1.75} aria-hidden="true" />
-      <p className="mt-3 text-[15px] font-semibold text-ink">{title}</p>
-      <p className="mt-1 text-sm text-muted">{message}</p>
+    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-card transition hover:border-edge">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex flex-1 flex-col text-left"
+        aria-label={`Buka laporan ${scan.name}, skor AI ${scan.probability} persen`}
+      >
+        <div className="grid aspect-[16/10] w-full place-items-center overflow-hidden border-b border-line bg-inset">
+          {scan.thumbnail ? (
+            <img
+              src={scan.thumbnail}
+              alt=""
+              width={400}
+              height={250}
+              className="size-full object-cover"
+            />
+          ) : (
+            <ImageIcon className="size-8 text-muted/60" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col justify-between p-4">
+          <p className="line-clamp-1 text-sm font-bold text-ink" title={scan.name}>
+            {scan.name}
+          </p>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="font-mono text-xs text-muted">{subline}</span>
+            <ScoreBadge
+              probability={scan.probability}
+              isAiGenerated={scan.isAiGenerated}
+              threshold={scan.threshold ?? 65}
+              showLabel={false}
+            />
+          </div>
+        </div>
+      </button>
+
+      <div className="flex justify-end border-t border-line px-3 py-1.5">
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Hapus ${scan.name} dari riwayat`}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-muted transition hover:bg-ai-bg hover:text-ai-fg"
+        >
+          <Trash2 className="size-3.5" strokeWidth={2} aria-hidden="true" />
+          <span>Hapus</span>
+        </button>
+      </div>
+    </article>
+  )
+}
+
+function EmptyState({ title, message, actionLabel, onAction }) {
+  return (
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center shadow-card">
+      <span
+        aria-hidden="true"
+        className="grid size-12 place-items-center rounded-2xl border border-line bg-subtle text-muted"
+      >
+        <History className="size-5" strokeWidth={1.75} />
+      </span>
+      <h2 className="mt-4 text-base font-bold text-ink">{title}</h2>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">{message}</p>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-action px-4 text-sm font-semibold text-action-fg transition hover:bg-action-hover"
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

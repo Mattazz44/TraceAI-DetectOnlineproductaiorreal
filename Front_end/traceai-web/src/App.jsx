@@ -1,57 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import HomeScreen from './components/HomeScreen.jsx'
-import HistoryScreen from './components/HistoryScreen.jsx'
 import AnalysisScreen from './components/AnalysisScreen.jsx'
 import EvidenceScreen from './components/EvidenceScreen.jsx'
+import Footer from './components/Footer.jsx'
+import Header from './components/Header.jsx'
+import HistoryScreen from './components/HistoryScreen.jsx'
+import HomeScreen from './components/HomeScreen.jsx'
 import { useRecentScans } from './hooks/useRecentScans.js'
-import {
-  ACCEPTED_TYPES,
-  USING_MOCK,
-  delay,
-  deriveDetails,
-  detectImage,
-  validateImage,
-} from './lib/detect.js'
-import { createThumbnail } from './lib/image.js'
+import { useTheme } from './hooks/useTheme.js'
+import { ACCEPTED_TYPES, delay, detectImage, validateImage } from './lib/detect.js'
+import { createThumbnail, formatMimeShort, inspectImageDimensions } from './lib/image.js'
 
 const ACCEPT = ACCEPTED_TYPES.join(',')
-// Minimum time the scanning state stays visible, so fast responses don't flash.
-const MIN_SCAN_MS = 1400
+const MIN_SCAN_MS = 650
 
-/**
- * Screens: 'landing' | 'history' | 'analysis' | 'evidence'
- *
- * Every navigation also pushes a browser-history entry ({ screen, depth }), so
- * the phone's hardware back button / browser back behaves like the in-app
- * back buttons. `popstate` is the single place that syncs history → state.
- */
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('landing')
-  /** Data for the analysis/evidence screens: { key, name, url, status: 'scanning'|'done', result } */
+  const [staged, setStaged] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [error, setError] = useState(null)
 
-  const { scans, addScan } = useRecentScans()
+  const { theme, toggleTheme } = useTheme()
+  const { scans, addScan, removeScan, clearScans } = useRecentScans()
 
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const abortRef = useRef(null)
 
-  // Release the preview object URL when it's no longer used.
-  const previewUrl = analysis?.url
+  const stagedUrl = staged?.previewUrl
   useEffect(() => {
-    if (!previewUrl?.startsWith('blob:')) return
-    return () => URL.revokeObjectURL(previewUrl)
-  }, [previewUrl])
+    if (!stagedUrl?.startsWith('blob:')) return
+    return () => URL.revokeObjectURL(stagedUrl)
+  }, [stagedUrl])
 
-  // Each screen starts at the top.
+  const analysisUrl = analysis?.url
+  useEffect(() => {
+    if (!analysisUrl?.startsWith('blob:')) return
+    return () => URL.revokeObjectURL(analysisUrl)
+  }, [analysisUrl])
+
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [currentScreen])
 
-  /* ---------------- navigation ---------------- */
-
-  /** Go forward to `screen`. Use `replace` to swap the current entry instead of stacking. */
   const navigate = useCallback((screen, { replace = false } = {}) => {
     const depth = history.state?.depth ?? 0
     if (replace && depth > 0) history.replaceState({ screen, depth }, '')
@@ -59,29 +49,28 @@ export default function App() {
     setCurrentScreen(screen)
   }, [])
 
-  /** One step back (same as the hardware back button). */
   const goBack = useCallback(() => {
-    if ((history.state?.depth ?? 0) > 0) history.back() // → popstate
+    if ((history.state?.depth ?? 0) > 0) history.back()
     else setCurrentScreen('landing')
   }, [])
 
-  /** Jump straight back to the landing page, unwinding all in-app history entries. */
-  const goLanding = useCallback(() => {
+  const goLanding = useCallback((clearDraft = false) => {
+    if (clearDraft) {
+      setStaged(null)
+      setError(null)
+    }
     const depth = history.state?.depth ?? 0
-    if (depth > 0) history.go(-depth) // → popstate
+    if (depth > 0) history.go(-depth)
     else setCurrentScreen('landing')
   }, [])
 
   useEffect(() => {
-    // After a reload the entry may still point at an inner screen while we render landing.
     if (history.state?.screen) history.replaceState(null, '')
-
     const onPop = (e) => setCurrentScreen(e.state?.screen ?? 'landing')
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  // Leaving the analysis flow cancels any in-flight scan.
   useEffect(() => {
     if (currentScreen === 'landing' || currentScreen === 'history') {
       abortRef.current?.abort()
@@ -89,133 +78,156 @@ export default function App() {
     }
   }, [currentScreen])
 
-  /* ---------------- scanning ---------------- */
-
-  const startRun = () => {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    return controller
-  }
-
-  const openAnalysis = useCallback(
-    (next) => {
-      setAnalysis(next)
-      // Re-scanning while already on the result (e.g. paste) replaces it instead of stacking.
-      const onAnalysis = ['analysis', 'evidence'].includes(history.state?.screen)
-      navigate('analysis', { replace: onAnalysis })
-    },
-    [navigate],
-  )
-
-  const handleFile = useCallback(
+  const handleStageFile = useCallback(
     async (file) => {
       const validationError = validateImage(file)
       if (validationError) {
         setError(validationError)
+        if (currentScreen !== 'landing') goLanding(false)
         return
       }
 
-      const controller = startRun()
-      const key = crypto.randomUUID?.() ?? String(Date.now())
       setError(null)
-      openAnalysis({ key, name: file.name, url: URL.createObjectURL(file), status: 'scanning', result: null })
-
-      try {
-        const [res, thumbnail] = await Promise.all([
-          detectImage(file, { signal: controller.signal }),
-          createThumbnail(file),
-          delay(MIN_SCAN_MS, controller.signal),
-        ])
-        if (controller.signal.aborted) return
-
-        setAnalysis((a) => (a?.key === key ? { ...a, status: 'done', result: res } : a))
-        addScan({
-          id: key,
-          name: file.name,
-          probability: res.probability,
-          isAiGenerated: res.isAiGenerated,
-          threshold: res.threshold,
-          classification: res.classification ?? null,
-          modelConfidence: res.modelConfidence ?? null,
-          verdictText: res.verdictText ?? null,
-          modelFile: res.modelFile ?? null,
-          isFallbackModel: res.isFallbackModel ?? false,
-          modelWarning: res.modelWarning ?? null,
-          confidence: res.confidence ?? null,
-          details: res.details ?? null,
-          thumbnail,
-          scannedAt: Date.now(),
-        })
-      } catch (err) {
-        if (err?.name === 'AbortError') return
-        setError(err?.message || 'Gagal menganalisis gambar. Periksa koneksi lalu coba lagi.')
-        goLanding()
+      const previewUrl = URL.createObjectURL(file)
+      const dimensions = await inspectImageDimensions(file)
+      setStaged({ file, previewUrl, dimensions })
+      if (currentScreen !== 'landing') {
+        goLanding(false)
       }
     },
-    [addScan, openAnalysis, goLanding],
+    [currentScreen, goLanding],
   )
 
-  /** Re-opens a saved scan, replaying a short scan animation before the stored result. */
+  const handleClearStaged = useCallback(() => {
+    setStaged(null)
+    setError(null)
+  }, [])
+
+  const handleStartScan = useCallback(async () => {
+    if (!staged?.file) return
+    const { file, dimensions } = staged
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    const key = crypto.randomUUID?.() ?? String(Date.now())
+    const scanPreviewUrl = URL.createObjectURL(file)
+    setError(null)
+
+    setAnalysis({
+      key,
+      name: file.name,
+      url: scanPreviewUrl,
+      dimensions,
+      fileSize: file.size,
+      fileFormat: formatMimeShort(file.type),
+      status: 'scanning',
+      result: null,
+    })
+
+    const onInnerScreen = ['analysis', 'evidence'].includes(history.state?.screen)
+    navigate('analysis', { replace: onInnerScreen })
+
+    try {
+      const [res, thumbnail] = await Promise.all([
+        detectImage(file, { signal: controller.signal }),
+        createThumbnail(file),
+        delay(MIN_SCAN_MS, controller.signal),
+      ])
+      if (controller.signal.aborted) return
+
+      setStaged(null)
+      setAnalysis((cur) => (cur?.key === key ? { ...cur, status: 'done', result: res } : cur))
+
+      addScan({
+        id: res.scanId || key,
+        name: file.name,
+        probability: res.probability,
+        exactAiProb: res.exactAiProb,
+        exactNonAiProb: res.exactNonAiProb,
+        isAiGenerated: res.isAiGenerated,
+        threshold: res.threshold,
+        classification: res.classification ?? null,
+        modelConfidence: res.modelConfidence ?? null,
+        confidencePercent: res.confidencePercent ?? null,
+        verdictText: res.verdictText ?? null,
+        modelFile: res.modelFile ?? null,
+        isFallbackModel: res.isFallbackModel ?? false,
+        modelWarning: res.modelWarning ?? null,
+        details: res.details ?? null,
+        thumbnail,
+        scannedAt: Date.now(),
+      })
+    } catch (err) {
+      if (err?.name === 'AbortError') return
+      setError(
+        err?.message || 'Gagal menganalisis gambar. Pastikan server Backend berjalan lalu coba lagi.',
+      )
+      goLanding(false)
+    }
+  }, [staged, navigate, addScan, goLanding])
+
   const handleSelectScan = useCallback(
-    async (scan) => {
-      const controller = startRun()
-      const key = `replay-${scan.id}-${Date.now()}`
+    (scan) => {
+      abortRef.current?.abort()
       setError(null)
-      openAnalysis({
-        key,
+      const threshold = scan.threshold ?? 65
+      const result = {
+        scanId: scan.id ?? null,
+        timestamp: scan.scannedAt ? new Date(scan.scannedAt).toISOString() : null,
+        probability: scan.probability,
+        exactAiProb: scan.exactAiProb ?? scan.probability,
+        exactNonAiProb: scan.exactNonAiProb ?? Math.max(0, 100 - scan.probability),
+        isAiGenerated:
+          typeof scan.isAiGenerated === 'boolean'
+            ? scan.isAiGenerated
+            : scan.probability >= threshold,
+        threshold,
+        classification: scan.classification ?? null,
+        modelConfidence: scan.modelConfidence ?? null,
+        confidencePercent: scan.confidencePercent ?? scan.confidence ?? undefined,
+        verdictText: scan.verdictText ?? null,
+        modelFile: scan.modelFile ?? null,
+        isFallbackModel: scan.isFallbackModel ?? false,
+        modelWarning: scan.modelWarning ?? null,
+        details: scan.details ?? null,
+      }
+
+      setAnalysis({
+        key: `saved-${scan.id}-${Date.now()}`,
         name: scan.name,
         url: scan.thumbnail ?? null,
-        status: 'scanning',
-        result: null,
+        dimensions: scan.details?.imageMeta ?? null,
+        fileSize: scan.details?.imageMeta?.file_size_bytes ?? null,
+        fileFormat: scan.details?.imageMeta?.format ?? null,
+        status: 'done',
+        result,
       })
 
-      try {
-        await delay(MIN_SCAN_MS, controller.signal)
-        const result = {
-          probability: scan.probability,
-          isAiGenerated:
-            typeof scan.isAiGenerated === 'boolean'
-              ? scan.isAiGenerated
-              : scan.probability >= (scan.threshold ?? 50),
-          threshold: scan.threshold ?? 50,
-          classification: scan.classification ?? null,
-          modelConfidence: scan.modelConfidence ?? null,
-          verdictText: scan.verdictText ?? null,
-          modelFile: scan.modelFile ?? null,
-          isFallbackModel: scan.isFallbackModel ?? false,
-          modelWarning: scan.modelWarning ?? null,
-          confidence: scan.confidence ?? undefined,
-          // In mock mode, regenerate details so older saved scans get the latest evidence fields.
-          details:
-            scan.details && !USING_MOCK ? scan.details : deriveDetails(scan.probability),
-        }
-        setAnalysis((a) => (a?.key === key ? { ...a, status: 'done', result } : a))
-      } catch {
-        /* aborted */
-      }
+      const onInnerScreen = ['analysis', 'evidence'].includes(history.state?.screen)
+      navigate('analysis', { replace: onInnerScreen })
     },
-    [openAnalysis],
+    [navigate],
   )
 
-  // Paste an image from the clipboard (handy on desktop).
   useEffect(() => {
     const onPaste = (e) => {
+      const targetTag = e.target?.tagName
+      if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') return
       const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'))
       const file = item?.getAsFile()
-      if (file) handleFile(file)
+      if (file) handleStageFile(file)
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [handleFile])
+  }, [handleStageFile])
 
   const onInputChange = (e) => {
     const file = e.target.files?.[0]
-    e.target.value = '' // allow selecting the same file again
-    if (file) handleFile(file)
+    e.target.value = ''
+    if (file) handleStageFile(file)
   }
-
-  /* ---------------- render ---------------- */
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -223,9 +235,11 @@ export default function App() {
         return (
           <HistoryScreen
             scans={scans}
-            onBack={goLanding}
-            onNewScan={goLanding}
+            onBack={() => goLanding(false)}
+            onNewScan={() => goLanding(true)}
             onSelectScan={handleSelectScan}
+            onRemoveScan={removeScan}
+            onClearScans={clearScans}
           />
         )
 
@@ -236,11 +250,11 @@ export default function App() {
               key={`${analysis.key}-evidence`}
               scan={analysis}
               onBack={goBack}
-              onHome={goLanding}
+              onHome={() => goLanding(true)}
             />
           )
         }
-      // falls through – evidence needs a finished result
+      // falls through when evidence has no completed scan
 
       case 'analysis':
         if (analysis) {
@@ -249,19 +263,22 @@ export default function App() {
               key={analysis.key}
               scan={analysis}
               onBack={goBack}
-              onRescan={goLanding}
+              onRescan={() => goLanding(true)}
               onShowEvidence={() => navigate('evidence')}
             />
           )
         }
-      // falls through – nothing to show (e.g. after forward-navigating into a stale entry)
+      // falls through to landing
 
       default:
         return (
           <HomeScreen
+            staged={staged}
             error={error}
             scans={scans}
-            onFile={handleFile}
+            onStageFile={handleStageFile}
+            onStartScan={handleStartScan}
+            onClearStaged={handleClearStaged}
             onTakePhoto={() => cameraInputRef.current?.click()}
             onPickGallery={() => galleryInputRef.current?.click()}
             onSelectScan={handleSelectScan}
@@ -272,10 +289,24 @@ export default function App() {
   }
 
   return (
-    <>
-      {renderScreen()}
+    <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+      <Header
+        activeScreen={currentScreen}
+        scansCount={scans.length}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onNavigateHome={() => goLanding(false)}
+        onNavigateHistory={() => {
+          if (currentScreen !== 'history') navigate('history')
+        }}
+      />
 
-      {/* Hidden file inputs. `capture` opens the rear camera on mobile; desktop falls back to a file picker. */}
+      <main id="pemeriksaan" className="flex-1">
+        {renderScreen()}
+      </main>
+
+      <Footer />
+
       <input
         ref={cameraInputRef}
         type="file"
@@ -295,6 +326,6 @@ export default function App() {
         tabIndex={-1}
         aria-hidden="true"
       />
-    </>
+    </div>
   )
 }

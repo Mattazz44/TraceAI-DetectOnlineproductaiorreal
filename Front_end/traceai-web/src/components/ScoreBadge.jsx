@@ -1,27 +1,31 @@
-/**
- * Probability badge. Colour reflects how likely the image is AI-generated:
- *   ≥ 70                       → amber   (AI tinggi)
- *   40–69 or isAiGenerated     → yellow  (AI sedang / terindikasi sintetis)
- *   < 40 and not isAiGenerated → neon    (AI rendah / asli)
- */
-export function getScoreTone(probability, isAiGenerated) {
-  if (probability >= 70) return { className: 'bg-amber text-ink', label: 'Kemungkinan buatan AI' }
-  if (probability >= 40 || isAiGenerated === true)
-    return { className: 'bg-[#ffe066] text-ink', label: 'Terindikasi sintetis' }
-  return { className: 'bg-neon text-ink', label: 'Kemungkinan asli' }
-}
+import { AlertTriangle, ShieldCheck } from 'lucide-react'
+import { getVerdict } from '../lib/verdict.js'
 
-export default function ScoreBadge({ probability, isAiGenerated, size = 'md' }) {
-  const tone = getScoreTone(probability, isAiGenerated)
-  const sizing = size === 'lg' ? 'px-3 py-1.5 text-base' : 'px-2.5 py-1 text-sm'
+export default function ScoreBadge({
+  probability,
+  isAiGenerated,
+  threshold = 65,
+  size = 'md',
+  showLabel = true,
+}) {
+  const verdict = getVerdict(probability, isAiGenerated, threshold)
+  const isSafe = verdict.tone === 'safe'
+  const Icon = isSafe ? ShieldCheck : AlertTriangle
+
+  const sizeClasses =
+    size === 'lg'
+      ? 'px-3 py-1.5 text-sm gap-1.5'
+      : 'px-2.5 py-1 text-xs gap-1.5'
 
   return (
     <span
-      className={`inline-flex min-w-14 shrink-0 items-center justify-center rounded-lg font-bold tabular-nums ${sizing} ${tone.className}`}
-      title={`${probability}% — ${tone.label}`}
-      aria-label={`${probability} persen kemungkinan buatan AI`}
+      className={`inline-flex shrink-0 items-center rounded-lg border font-semibold ${sizeClasses} ${verdict.pillClass}`}
+      title={`${verdict.badge} (${probability}% skor AI)`}
+      aria-label={`${verdict.badge}, skor AI ${probability} persen`}
     >
-      {probability}%
+      <Icon className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+      {showLabel && <span className="hidden sm:inline">{verdict.badge}</span>}
+      <span className="font-mono font-semibold tabular-nums">{probability}%</span>
     </span>
   )
 }

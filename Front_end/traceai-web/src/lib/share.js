@@ -1,29 +1,28 @@
-/**
- * Opens the native share sheet (Web Share API) when available, otherwise
- * copies the text + link to the clipboard.
- *
- * Must be called directly from a user gesture (click handler) — browsers
- * reject navigator.share() without transient user activation.
- *
- * Note: navigator.share is only exposed in secure contexts (HTTPS or localhost).
- *
- * @returns {Promise<'shared' | 'cancelled' | 'copied' | 'failed'>}
- */
+export function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+  const hasTouch = navigator.maxTouchPoints > 1 && !/Windows NT/i.test(ua)
+  return isMobileUA || hasTouch
+}
+
 export async function shareOrCopy({ title, text, url }) {
   const data = { title, text, url }
+  const fullTextToCopy = `${text}\n${url}`
 
-  if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare(data))) {
+  // Desktop Windows share flyouts often hang without registered targets, so copy directly on desktop.
+  if (isMobileDevice() && typeof navigator.share === 'function') {
     try {
-      await navigator.share(data)
-      return 'shared'
+      if (!navigator.canShare || navigator.canShare(data)) {
+        await navigator.share(data)
+        return 'shared'
+      }
     } catch (err) {
-      // User closed the share sheet — not an error.
       if (err?.name === 'AbortError') return 'cancelled'
-      // Anything else (NotAllowedError, etc.) → fall back to copying.
     }
   }
 
-  return (await copyText(`${text}\n\n${url}`)) ? 'copied' : 'failed'
+  return (await copyText(fullTextToCopy)) ? 'copied' : 'failed'
 }
 
 export async function copyText(value) {
@@ -33,10 +32,9 @@ export async function copyText(value) {
       return true
     }
   } catch {
-    /* fall through to legacy path */
+    /* fallback below */
   }
 
-  // Legacy fallback for insecure contexts / older browsers.
   try {
     const el = document.createElement('textarea')
     el.value = value
@@ -52,4 +50,3 @@ export async function copyText(value) {
     return false
   }
 }
-
