@@ -97,6 +97,12 @@ export default function HistoryScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [confirmClear])
 
+  useEffect(() => {
+    if (scans.length === 0 && confirmClear) {
+      setConfirmClear(false)
+    }
+  }, [scans.length, confirmClear])
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
     const activeFilter = FILTERS.find((f) => f.id === filter) ?? FILTERS[0]
@@ -114,13 +120,13 @@ export default function HistoryScreen({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 animate-fade-in">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 animate-fade-in">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
+            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card/95 text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
             aria-label="Kembali ke halaman pemeriksaan"
           >
             <ChevronLeft className="size-5" strokeWidth={2.25} aria-hidden="true" />
@@ -130,12 +136,13 @@ export default function HistoryScreen({
             <h1
               ref={headingRef}
               tabIndex={-1}
-              className="text-xl font-extrabold tracking-tight text-ink outline-none sm:text-2xl"
+              className="text-2xl leading-tight font-extrabold tracking-[-0.025em] text-ink outline-none sm:text-[1.75rem]"
             >
               Riwayat Pemeriksaan
             </h1>
-            <p className="text-xs text-muted">
-              {scans.length} laporan tersimpan di peramban perangkat ini
+            <p className="mt-0.5 text-xs text-muted tabular-nums">
+              <span className="font-semibold text-ink">{scans.length}</span> laporan tersimpan di
+              peramban perangkat ini
             </p>
           </div>
         </div>
@@ -145,7 +152,7 @@ export default function HistoryScreen({
             <button
               type="button"
               onClick={() => setConfirmClear(true)}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 text-xs font-semibold text-muted transition hover:border-ai-border hover:bg-ai-bg hover:text-ai-fg"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-card/95 px-3.5 text-xs font-semibold text-muted transition hover:border-ai-border hover:bg-ai-bg hover:text-ai-fg sm:flex-none"
             >
               <Trash2 className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
               <span>Hapus Semua</span>
@@ -156,32 +163,35 @@ export default function HistoryScreen({
             <div
               role="group"
               aria-label="Konfirmasi hapus seluruh riwayat"
-              className="flex items-center gap-1.5 rounded-xl border border-ai-border bg-ai-bg p-1"
+              className="flex w-full flex-wrap items-center justify-between gap-1.5 rounded-xl border border-ai-border bg-ai-bg p-1.5 sm:w-auto animate-fade-in"
             >
-              <button
-                type="button"
-                onClick={() => {
-                  onClearScans()
-                  setConfirmClear(false)
-                }}
-                className="min-h-11 rounded-lg bg-ai-bar px-3 text-xs font-bold text-white transition hover:opacity-90"
-              >
-                Ya, Hapus Semua
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmClear(false)}
-                className="min-h-11 rounded-lg bg-card px-3 text-xs font-semibold text-ink transition hover:bg-subtle"
-              >
-                Batal
-              </button>
+              <span className="px-2 text-xs font-semibold text-ai-fg">Hapus semua?</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClearScans()
+                    setConfirmClear(false)
+                  }}
+                  className="min-h-11 rounded-lg bg-ai-bar px-3 text-xs font-bold text-white transition hover:opacity-90"
+                >
+                  Ya, Hapus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(false)}
+                  className="min-h-11 rounded-lg bg-card px-3 text-xs font-semibold text-ink transition hover:bg-subtle"
+                >
+                  Batal
+                </button>
+              </div>
             </div>
           )}
 
           <button
             type="button"
             onClick={onNewScan}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-brand px-4 text-xs font-semibold text-white transition hover:bg-emerald-brand-hover sm:text-sm"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover sm:min-h-11 sm:w-auto"
           >
             <Plus className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
             <span>Periksa Gambar Baru</span>
@@ -190,8 +200,8 @@ export default function HistoryScreen({
       </div>
 
       {scans.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-line bg-card p-4 shadow-card">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mt-6 rounded-2xl border border-line bg-card/95 p-4 shadow-card">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="flex-1">
               <label
                 htmlFor="history-search-input"
@@ -234,7 +244,7 @@ export default function HistoryScreen({
               <div
                 role="group"
                 aria-label="Filter status deteksi"
-                className="inline-flex rounded-xl border border-line bg-subtle p-1"
+                className="inline-flex flex-wrap rounded-xl border border-line bg-subtle p-1"
               >
                 {FILTERS.map((item) => {
                   const active = filter === item.id
@@ -245,10 +255,8 @@ export default function HistoryScreen({
                       aria-pressed={active}
                       onClick={() => setFilter(item.id)}
                       className={[
-                        'min-h-11 rounded-lg px-3 text-xs font-semibold transition',
-                        active
-                          ? 'bg-card text-ink shadow-card'
-                          : 'text-muted hover:text-ink',
+                        'min-h-11 rounded-lg px-2.5 text-xs font-semibold transition sm:px-3',
+                        active ? 'bg-card text-ink shadow-card' : 'text-muted hover:text-ink',
                       ].join(' ')}
                     >
                       {item.label}
@@ -318,11 +326,13 @@ export default function HistoryScreen({
                 <h2 id={`group-${group.key}`} className="text-sm font-bold text-ink">
                   {group.label}
                 </h2>
-                {group.date && <span className="font-mono text-xs text-muted">{group.date}</span>}
+                {group.date && (
+                  <span className="text-xs font-medium text-muted tabular-nums">{group.date}</span>
+                )}
               </div>
 
               {viewMode === 'grid' ? (
-                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {group.items.map((scan) => (
                     <li key={scan.id}>
                       <HistoryGridCard
@@ -358,16 +368,14 @@ function HistoryListRow({ scan, onSelect, onRemove }) {
   const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : 'Waktu tidak tercatat'
   const meta = scan.details?.imageMeta
   const subline =
-    meta?.width && meta?.height
-      ? `${time} · ${meta.width}x${meta.height} px`
-      : time
+    meta?.width && meta?.height ? `${time} · ${meta.width}x${meta.height} px` : time
 
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-line bg-card p-2.5 shadow-card transition hover:border-edge">
+    <div className="flex items-center gap-2 rounded-2xl border border-line bg-card/95 p-2.5 shadow-card transition hover:border-edge">
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-3.5 rounded-xl p-1 text-left"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left sm:gap-3.5"
         aria-label={`Buka laporan ${scan.name}, skor AI ${scan.probability} persen`}
       >
         <ScanThumb scan={scan} size="lg" />
@@ -375,7 +383,7 @@ function HistoryListRow({ scan, onSelect, onRemove }) {
           <p className="truncate text-sm font-bold text-ink sm:text-[15px]" title={scan.name}>
             {scan.name}
           </p>
-          <p className="mt-0.5 font-mono text-xs text-muted">{subline}</p>
+          <p className="mt-0.5 truncate text-xs text-muted tabular-nums">{subline}</p>
         </div>
         <ScoreBadge
           probability={scan.probability}
@@ -386,8 +394,12 @@ function HistoryListRow({ scan, onSelect, onRemove }) {
 
       <button
         type="button"
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
         aria-label={`Hapus ${scan.name} dari riwayat`}
+        title="Hapus item riwayat"
         className="grid size-11 shrink-0 place-items-center rounded-xl text-muted transition hover:bg-ai-bg hover:text-ai-fg"
       >
         <Trash2 className="size-4" strokeWidth={2} aria-hidden="true" />
@@ -400,26 +412,24 @@ function HistoryGridCard({ scan, onSelect, onRemove }) {
   const time = scan.scannedAt ? timeFmt.format(scan.scannedAt) : 'Waktu tidak tercatat'
   const meta = scan.details?.imageMeta
   const subline =
-    meta?.width && meta?.height
-      ? `${time} · ${meta.width}x${meta.height} px`
-      : time
+    meta?.width && meta?.height ? `${time} · ${meta.width}x${meta.height} px` : time
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-card transition hover:border-edge">
+    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-card/95 shadow-card transition hover:border-edge">
       <button
         type="button"
         onClick={onSelect}
-        className="flex flex-1 flex-col text-left"
+        className="group flex flex-1 flex-col text-left"
         aria-label={`Buka laporan ${scan.name}, skor AI ${scan.probability} persen`}
       >
-        <div className="grid aspect-[16/10] w-full place-items-center overflow-hidden border-b border-line bg-inset">
+        <div className="flex h-44 w-full items-center justify-center overflow-hidden border-b border-line bg-stage p-2.5">
           {scan.thumbnail ? (
             <img
               src={scan.thumbnail}
               alt=""
               width={400}
               height={250}
-              className="size-full object-cover"
+              className="h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.03]"
             />
           ) : (
             <ImageIcon className="size-8 text-muted/60" strokeWidth={1.5} aria-hidden="true" />
@@ -431,7 +441,7 @@ function HistoryGridCard({ scan, onSelect, onRemove }) {
             {scan.name}
           </p>
           <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="font-mono text-xs text-muted">{subline}</span>
+            <span className="truncate text-xs text-muted tabular-nums">{subline}</span>
             <ScoreBadge
               probability={scan.probability}
               isAiGenerated={scan.isAiGenerated}
@@ -445,7 +455,10 @@ function HistoryGridCard({ scan, onSelect, onRemove }) {
       <div className="flex justify-end border-t border-line px-3 py-1.5">
         <button
           type="button"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
           aria-label={`Hapus ${scan.name} dari riwayat`}
           className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-muted transition hover:bg-ai-bg hover:text-ai-fg"
         >
@@ -459,7 +472,7 @@ function HistoryGridCard({ scan, onSelect, onRemove }) {
 
 function EmptyState({ title, message, actionLabel, onAction }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center shadow-card">
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card/95 px-6 py-12 text-center shadow-card">
       <span
         aria-hidden="true"
         className="grid size-12 place-items-center rounded-2xl border border-line bg-subtle text-muted"
@@ -472,7 +485,7 @@ function EmptyState({ title, message, actionLabel, onAction }) {
         <button
           type="button"
           onClick={onAction}
-          className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-action px-4 text-sm font-semibold text-action-fg transition hover:bg-action-hover"
+          className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-action px-5 text-sm font-semibold text-action-fg transition hover:bg-action-hover sm:min-h-11 sm:w-auto"
         >
           {actionLabel}
         </button>

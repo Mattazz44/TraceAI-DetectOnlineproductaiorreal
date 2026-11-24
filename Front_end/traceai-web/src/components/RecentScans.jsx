@@ -1,4 +1,5 @@
-import { ChevronRight, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, Clock, Trash2 } from 'lucide-react'
 import ScanThumb from './ScanThumb.jsx'
 import ScoreBadge from './ScoreBadge.jsx'
 
@@ -9,14 +10,40 @@ const timeFormatter = new Intl.DateTimeFormat('id-ID', {
   minute: '2-digit',
 })
 
-export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
+export default function RecentScans({
+  scans,
+  limit = 5,
+  onSelect,
+  onRemove,
+  onClearAll,
+  onSeeAll,
+}) {
+  const [confirmClear, setConfirmClear] = useState(false)
   const visible = scans.slice(0, limit)
 
+  useEffect(() => {
+    if (!confirmClear) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setConfirmClear(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmClear])
+
+  useEffect(() => {
+    if (scans.length === 0 && confirmClear) {
+      setConfirmClear(false)
+    }
+  }, [scans.length, confirmClear])
+
   return (
-    <section aria-labelledby="recent-heading" className="rounded-2xl border border-line bg-card p-4 shadow-card sm:p-5">
-      <div className="flex items-center justify-between gap-2">
+    <section
+      aria-labelledby="recent-heading"
+      className="rounded-2xl border border-line bg-card/95 p-4 shadow-card sm:p-5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="recent-heading" className="text-base font-bold text-ink">
+          <h2 id="recent-heading" className="text-base font-bold tracking-[-0.02em] text-ink">
             Riwayat Terbaru
           </h2>
           <p className="mt-0.5 text-xs text-muted">
@@ -25,16 +52,60 @@ export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
         </div>
 
         {scans.length > 0 && (
-          <button
-            type="button"
-            onClick={onSeeAll}
-            className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-line bg-subtle px-3 text-xs font-semibold text-ink transition hover:border-edge"
-          >
-            <span>Lihat Semua ({scans.length})</span>
-            <ChevronRight className="size-3.5" strokeWidth={2.25} aria-hidden="true" />
-          </button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {onClearAll && !confirmClear && (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-muted transition hover:border-ai-border hover:bg-ai-bg hover:text-ai-fg"
+              >
+                <Trash2 className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+                <span>Hapus Semua</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onSeeAll}
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-line bg-subtle px-3 text-xs font-semibold text-ink tabular-nums transition hover:border-edge"
+            >
+              <span>Lihat Semua ({scans.length})</span>
+              <ChevronRight className="size-3.5" strokeWidth={2.25} aria-hidden="true" />
+            </button>
+          </div>
         )}
       </div>
+
+      {confirmClear && scans.length > 0 && (
+        <div
+          role="group"
+          aria-label="Konfirmasi hapus seluruh riwayat terbaru"
+          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ai-border bg-ai-bg p-3 animate-fade-in"
+        >
+          <p className="text-xs font-semibold text-ai-fg tabular-nums">
+            Hapus seluruh {scans.length} riwayat tersimpan?
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                onClearAll?.()
+                setConfirmClear(false)
+              }}
+              className="min-h-11 rounded-lg bg-ai-bar px-3 text-xs font-bold text-white transition hover:opacity-90"
+            >
+              Ya, Hapus
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmClear(false)}
+              className="min-h-11 rounded-lg bg-card px-3 text-xs font-semibold text-ink transition hover:bg-subtle"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-line bg-subtle/50 px-4 py-8 text-center">
@@ -60,11 +131,14 @@ export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
                 : stamp
 
             return (
-              <li key={scan.id}>
+              <li
+                key={scan.id}
+                className="flex items-center gap-1.5 rounded-xl border border-line bg-subtle/40 p-1.5 transition hover:border-edge hover:bg-subtle/75"
+              >
                 <button
                   type="button"
                   onClick={() => onSelect(scan)}
-                  className="group flex min-h-16 w-full items-center gap-3 rounded-xl border border-line bg-subtle/40 p-2.5 text-left transition hover:border-edge hover:bg-subtle active:scale-[0.99]"
+                  className="group flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left"
                   aria-label={`Buka laporan ${scan.name}, skor AI ${scan.probability} persen`}
                 >
                   <ScanThumb scan={scan} />
@@ -72,7 +146,9 @@ export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
                     <p className="truncate text-sm font-semibold text-ink" title={scan.name}>
                       {scan.name}
                     </p>
-                    <p className="mt-0.5 truncate font-mono text-[11px] text-muted">{metaLine}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted tabular-nums">
+                      {metaLine}
+                    </p>
                   </div>
                   <ScoreBadge
                     probability={scan.probability}
@@ -80,12 +156,22 @@ export default function RecentScans({ scans, limit = 5, onSelect, onSeeAll }) {
                     threshold={scan.threshold ?? 65}
                     showLabel={false}
                   />
-                  <ChevronRight
-                    className="size-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink"
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  />
                 </button>
+
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemove(scan.id)
+                    }}
+                    aria-label={`Hapus ${scan.name} dari riwayat`}
+                    title="Hapus item riwayat"
+                    className="grid size-11 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-ai-bg hover:text-ai-fg"
+                  >
+                    <Trash2 className="size-4" strokeWidth={2} aria-hidden="true" />
+                  </button>
+                )}
               </li>
             )
           })}

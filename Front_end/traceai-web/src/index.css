@@ -9,6 +9,7 @@
   --surface-card: #ffffff;
   --surface-subtle: #edf0ec;
   --surface-inset: #e4e9e5;
+  --surface-stage: #eff2ee;
   --text-primary: #111513;
   --text-secondary: #47524c;
   --border-subtle: #d5dcd7;
@@ -46,6 +47,7 @@
   --surface-card: #161c19;
   --surface-subtle: #1e2622;
   --surface-inset: #25302a;
+  --surface-stage: #121815;
   --text-primary: #f1f4f2;
   --text-secondary: #9ba8a1;
   --border-subtle: #2a352f;
@@ -78,13 +80,14 @@
 }
 
 @theme {
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
   --color-canvas: var(--surface-canvas);
   --color-card: var(--surface-card);
   --color-subtle: var(--surface-subtle);
   --color-inset: var(--surface-inset);
+  --color-stage: var(--surface-stage);
   --color-ink: var(--text-primary);
   --color-muted: var(--text-secondary);
   --color-line: var(--border-subtle);
@@ -117,6 +120,7 @@
   --animate-scan: scan-sweep 1.6s ease-in-out infinite;
   --animate-fade-in: fade-in 0.2s ease-out both;
   --animate-rise: rise-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-zoom-reveal: zoom-reveal 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   @keyframes scan-sweep {
     0%,
@@ -147,22 +151,51 @@
       transform: none;
     }
   }
+
+  @keyframes zoom-reveal {
+    from {
+      opacity: 0;
+      transform: scale(0.965);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }
 
 @layer base {
   html,
-  body,
+  body {
+    font-family: var(--font-sans);
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
   #root {
     min-height: 100%;
+    overflow-x: hidden;
   }
 
   body {
     background-color: var(--surface-canvas);
     color: var(--text-primary);
-    font-family: var(--font-sans);
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
-    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
   }
 
   a[href],

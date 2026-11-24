@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ChevronLeft,
@@ -6,12 +6,15 @@ import {
   Loader2,
   RotateCcw,
   ShieldCheck,
+  ZoomIn,
 } from 'lucide-react'
+import ImageLightbox from './ImageLightbox.jsx'
 import { useCountUp } from '../hooks/useCountUp.js'
 import { formatBytes } from '../lib/image.js'
 import { getConfidence, getVerdict } from '../lib/verdict.js'
 
 export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const headingRef = useRef(null)
   const isScanning = scan.status === 'scanning'
 
@@ -22,18 +25,19 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
 
   const result = scan.result
   const threshold = result?.threshold ?? 65
+  const dimensions = scan.dimensions || result?.details?.imageMeta || null
   const verdict = result
     ? getVerdict(result.probability, result.isAiGenerated, threshold)
     : null
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 animate-fade-in">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
+            className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card/95 text-ink transition hover:border-edge hover:bg-subtle active:scale-95"
             aria-label={isScanning ? 'Batalkan pemeriksaan dan kembali' : 'Kembali ke halaman sebelumnya'}
           >
             <ChevronLeft className="size-5" strokeWidth={2.25} aria-hidden="true" />
@@ -46,7 +50,7 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
             <h1
               ref={headingRef}
               tabIndex={-1}
-              className="truncate text-lg font-extrabold tracking-tight text-ink outline-none sm:text-xl"
+              className="truncate text-lg leading-snug font-extrabold tracking-[-0.025em] text-ink outline-none sm:text-xl"
               title={scan.name}
             >
               {scan.name}
@@ -54,18 +58,17 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
           </div>
         </div>
 
-        {verdict && (
-          <StatusPill verdict={verdict} />
-        )}
+        {verdict && <StatusPill verdict={verdict} />}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="space-y-4 lg:col-span-7">
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 md:grid-cols-12 md:gap-7 lg:gap-8">
+        <div className="space-y-4 md:col-span-7">
           <PreviewViewport
             url={scan.url}
             name={scan.name}
-            dimensions={scan.dimensions || result?.details?.imageMeta}
+            dimensions={dimensions}
             isScanning={isScanning}
+            onOpenLightbox={() => setLightboxOpen(true)}
           />
 
           {!isScanning && result && (
@@ -78,7 +81,7 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
           )}
         </div>
 
-        <div className="space-y-4 lg:col-span-5">
+        <div className="space-y-4 md:col-span-5">
           {isScanning ? (
             <ScanningPanel onCancel={onRescan} />
           ) : (
@@ -96,11 +99,11 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
                 <button
                   type="button"
                   onClick={onShowEvidence}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99]"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99]"
                 >
                   <FileSearch className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
                   <span>Buka Bukti & Metadata</span>
@@ -109,7 +112,7 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
                 <button
                   type="button"
                   onClick={onRescan}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card/95 px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
                 >
                   <RotateCcw className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
                   <span>Periksa Gambar Baru</span>
@@ -119,6 +122,14 @@ export default function AnalysisScreen({ scan, onBack, onRescan, onShowEvidence 
           )}
         </div>
       </div>
+
+      <ImageLightbox
+        open={lightboxOpen && !isScanning}
+        onClose={() => setLightboxOpen(false)}
+        url={scan.url}
+        name={scan.name}
+        dimensions={dimensions}
+      />
     </div>
   )
 }
@@ -135,18 +146,40 @@ function StatusPill({ verdict }) {
   )
 }
 
-function PreviewViewport({ url, name, dimensions, isScanning }) {
+function PreviewViewport({ url, name, dimensions, isScanning, onOpenLightbox }) {
   return (
-    <div className="forensic-frame relative grid aspect-[16/10] w-full place-items-center overflow-hidden rounded-2xl border border-line bg-inset shadow-card">
+    <div className="forensic-frame relative flex h-[280px] w-full items-center justify-center overflow-hidden rounded-2xl border border-line bg-stage p-4 shadow-card sm:h-[360px] sm:p-5 lg:h-[430px]">
       {url ? (
-        <img
-          src={url}
-          alt={`Pratinjau pemeriksaan ${name}`}
-          width={dimensions?.width || 800}
-          height={dimensions?.height || 500}
-          fetchPriority="high"
-          className="max-h-full max-w-full object-contain p-3 sm:p-4"
-        />
+        isScanning ? (
+          <img
+            src={url}
+            alt={`Pratinjau pemeriksaan ${name}`}
+            width={dimensions?.width || 800}
+            height={dimensions?.height || 500}
+            fetchPriority="high"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenLightbox}
+            aria-label={`Perbesar gambar ${name} untuk inspeksi detail penuh`}
+            className="group relative flex size-full items-center justify-center overflow-hidden rounded-lg"
+          >
+            <img
+              src={url}
+              alt={`Pratinjau pemeriksaan ${name}`}
+              width={dimensions?.width || 800}
+              height={dimensions?.height || 500}
+              fetchPriority="high"
+              className="h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.025] animate-zoom-reveal"
+            />
+            <span className="pointer-events-none absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card/95 px-2.5 py-1.5 text-xs font-semibold text-ink shadow-card transition group-hover:border-edge">
+              <ZoomIn className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+              <span>Perbesar</span>
+            </span>
+          </button>
+        )
       ) : (
         <p className="px-4 text-center text-sm text-muted">
           Pratinjau gambar asli tidak tersimpan pada riwayat lama
@@ -155,7 +188,7 @@ function PreviewViewport({ url, name, dimensions, isScanning }) {
 
       {isScanning && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-ink/10" />
+          <div className="absolute inset-0 bg-ink/8" />
           <div className="absolute inset-x-3 animate-scan">
             <div className="h-0.5 bg-emerald-brand" />
           </div>
@@ -171,7 +204,7 @@ function ScanningPanel({ onCancel }) {
       aria-labelledby="scanning-heading"
       role="status"
       aria-live="polite"
-      className="rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6"
+      className="rounded-2xl border border-line bg-card/95 p-5 shadow-card sm:p-6"
     >
       <div className="flex items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-safe-border bg-safe-bg text-safe-fg">
@@ -186,16 +219,16 @@ function ScanningPanel({ onCancel }) {
       </div>
 
       <ol className="mt-5 space-y-2.5 border-t border-line pt-4 text-xs text-muted sm:text-[13px]">
-        <li className="flex items-center gap-2.5 text-ink font-medium">
-          <span className="size-2 rounded-full bg-emerald-brand" aria-hidden="true" />
+        <li className="flex items-center gap-2.5 font-medium text-ink">
+          <span className="size-2 shrink-0 rounded-full bg-emerald-brand" aria-hidden="true" />
           <span>Menyesuaikan bidang tengah gambar (224x224 center-crop)</span>
         </li>
-        <li className="flex items-center gap-2.5 text-ink font-medium">
-          <span className="size-2 rounded-full bg-emerald-brand" aria-hidden="true" />
+        <li className="flex items-center gap-2.5 font-medium text-ink">
+          <span className="size-2 shrink-0 rounded-full bg-emerald-brand" aria-hidden="true" />
           <span>Menghitung probabilitas Swin Transformer dua arah (TTA)</span>
         </li>
         <li className="flex items-center gap-2.5">
-          <span className="size-2 rounded-full bg-edge" aria-hidden="true" />
+          <span className="size-2 shrink-0 rounded-full bg-edge" aria-hidden="true" />
           <span>Menyusun peta aktivasi Grad-CAM dan membaca atribut EXIF</span>
         </li>
       </ol>
@@ -203,7 +236,7 @@ function ScanningPanel({ onCancel }) {
       <button
         type="button"
         onClick={onCancel}
-        className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-edge bg-subtle px-4 text-sm font-semibold text-ink transition hover:bg-inset"
+        className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-edge bg-subtle px-4 text-sm font-semibold text-ink transition hover:bg-inset"
       >
         Batalkan Pemeriksaan
       </button>
@@ -225,7 +258,7 @@ function VerdictCard({ result, verdict, threshold }) {
   return (
     <section
       aria-labelledby="verdict-heading"
-      className="rounded-2xl border border-line bg-card p-5 shadow-card animate-rise sm:p-6"
+      className="rounded-2xl border border-line bg-card/95 p-5 shadow-card animate-rise sm:p-6"
     >
       <div className="flex items-start gap-3">
         <span
@@ -236,7 +269,10 @@ function VerdictCard({ result, verdict, threshold }) {
         </span>
         <div className="min-w-0">
           <p className="text-xs font-semibold text-muted">Kesimpulan Pemeriksaan</p>
-          <h2 id="verdict-heading" className="mt-0.5 text-xl leading-snug font-extrabold text-ink">
+          <h2
+            id="verdict-heading"
+            className="mt-0.5 text-xl leading-snug font-extrabold tracking-[-0.025em] text-ink"
+          >
             {verdict.headline}
           </h2>
         </div>
@@ -248,15 +284,15 @@ function VerdictCard({ result, verdict, threshold }) {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-muted">Skor Indikasi Buatan AI</p>
-            <p className="mt-0.5 flex items-baseline gap-1 font-mono text-3xl font-bold tabular-nums text-ink">
+            <p className="mt-1 flex items-baseline gap-1.5 font-mono text-[2rem] leading-none font-bold tabular-nums text-ink">
               <span>{animatedProb}%</span>
-              <span className="text-xs font-normal text-muted">({exactAi}%)</span>
+              <span className="text-xs font-medium text-muted">({exactAi}%)</span>
             </p>
           </div>
 
           <div className="text-right">
             <p className="text-xs font-medium text-muted">Skor Keaslian Foto</p>
-            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
+            <p className="mt-1 font-mono text-lg leading-none font-bold tabular-nums text-ink">
               {exactNonAi}%
             </p>
           </div>
@@ -286,10 +322,16 @@ function VerdictCard({ result, verdict, threshold }) {
           </div>
         </div>
 
-        <div className="mt-2 flex items-center justify-between font-mono text-[11px] text-muted">
-          <span>0% Asli</span>
-          <span className="font-semibold text-ink">Ambang AI: {Math.round(threshold)}%</span>
-          <span>100% AI</span>
+        <div className="mt-2 flex items-center justify-between text-[11px] text-muted">
+          <span>
+            <span className="font-mono">0%</span> Asli
+          </span>
+          <span className="font-semibold text-ink">
+            Ambang AI: <span className="font-mono">{Math.round(threshold)}%</span>
+          </span>
+          <span>
+            <span className="font-mono">100%</span> AI
+          </span>
         </div>
       </div>
     </section>
@@ -308,14 +350,14 @@ function ConfidenceCard({ result, threshold }) {
   return (
     <section
       aria-labelledby="confidence-heading"
-      className="rounded-2xl border border-line bg-card p-4 shadow-card animate-rise sm:p-5"
+      className="rounded-2xl border border-line bg-card/95 p-4 shadow-card animate-rise sm:p-5"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 id="confidence-heading" className="text-sm font-bold text-ink">
           Keyakinan Keputusan Model
         </h2>
-        <span className="font-mono text-xs font-semibold text-ink">
-          {level} ({percent}%)
+        <span className="text-xs font-bold text-ink">
+          {level} <span className="font-mono">({percent}%)</span>
         </span>
       </div>
 
@@ -334,9 +376,10 @@ function ConfidenceCard({ result, threshold }) {
         />
       </div>
 
-      <p className="mt-2.5 text-xs leading-relaxed text-muted">
-        Semakin jauh skor gambar dari ambang {Math.round(threshold)}%, semakin tegas pemisahan kelas
-        antara foto kamera dan gambar sintetis.
+      <p className="mt-2.5 text-xs leading-relaxed text-muted tabular-nums">
+        Semakin jauh skor gambar dari ambang{' '}
+        <span className="font-semibold text-ink">{Math.round(threshold)}%</span>, semakin tegas
+        pemisahan kelas antara foto kamera dan gambar sintetis.
       </p>
     </section>
   )
@@ -348,11 +391,12 @@ function TechnicalSummaryCard({ result, fallbackDimensions, fallbackSize, fallba
 
   const width = imageMeta?.width || fallbackDimensions?.width
   const height = imageMeta?.height || fallbackDimensions?.height
-  const resolution = width && height ? `${width} x ${height} px` : 'Tidak tercatat'
+  const hasResolution = Boolean(width && height)
+  const resolution = hasResolution ? `${width} x ${height} px` : 'Tidak tercatat'
 
-  const formatLabel = imageMeta?.format || fallbackFormat || 'Gambar'
+  const formatLabel = imageMeta?.format || fallbackFormat || null
   const byteSize = imageMeta?.file_size_bytes ?? fallbackSize
-  const sizeLabel = byteSize ? `${formatLabel} · ${formatBytes(byteSize)}` : formatLabel
+  const hasFileData = Boolean(formatLabel || byteSize)
 
   const exifStatus =
     imageMeta == null
@@ -368,7 +412,7 @@ function TechnicalSummaryCard({ result, fallbackDimensions, fallbackSize, fallba
   return (
     <section
       aria-labelledby="tech-summary-heading"
-      className="rounded-2xl border border-line bg-card p-4 shadow-card sm:p-5"
+      className="rounded-2xl border border-line bg-card/95 p-4 shadow-card sm:p-5"
     >
       <h2 id="tech-summary-heading" className="text-sm font-bold text-ink">
         Ringkasan Teknis File & Mesin
@@ -377,15 +421,24 @@ function TechnicalSummaryCard({ result, fallbackDimensions, fallbackSize, fallba
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-line bg-subtle/50 p-3">
           <dt className="text-[11px] font-medium text-muted">Resolusi</dt>
-          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={resolution}>
+          <dd
+            className={`mt-1 truncate text-xs font-semibold text-ink ${hasResolution ? 'font-mono' : ''}`}
+            title={resolution}
+          >
             {resolution}
           </dd>
         </div>
 
         <div className="rounded-xl border border-line bg-subtle/50 p-3">
           <dt className="text-[11px] font-medium text-muted">Format & Ukuran</dt>
-          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={sizeLabel}>
-            {sizeLabel}
+          <dd className="mt-1 truncate text-xs font-semibold text-ink">
+            {hasFileData ? (
+              <span className="font-mono">
+                {[formatLabel, byteSize ? formatBytes(byteSize) : null].filter(Boolean).join(' · ')}
+              </span>
+            ) : (
+              'Tidak tercatat'
+            )}
           </dd>
         </div>
 
@@ -398,7 +451,7 @@ function TechnicalSummaryCard({ result, fallbackDimensions, fallbackSize, fallba
 
         <div className="rounded-xl border border-line bg-subtle/50 p-3">
           <dt className="text-[11px] font-medium text-muted">Mesin Inferensi</dt>
-          <dd className="mt-1 truncate font-mono text-xs font-semibold text-ink" title={engineLabel}>
+          <dd className="mt-1 truncate text-xs font-semibold text-ink" title={engineLabel}>
             {engineLabel}
           </dd>
         </div>

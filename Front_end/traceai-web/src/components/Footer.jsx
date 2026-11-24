@@ -1,13 +1,35 @@
-export default function Footer() {
+import { Pause, Play } from 'lucide-react'
+
+export default function Footer({ bgPaused = false, onToggleBgMotion }) {
   return (
-    <footer className="mt-auto border-t border-line bg-card/60">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-1.5 px-4 py-4 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
-        <p>
+    <footer className="mt-auto border-t border-line bg-card/95 font-sans">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-4 py-4 text-center text-xs leading-relaxed text-muted sm:px-6 md:flex-row md:gap-4 md:text-left lg:px-8">
+        <p className="text-muted md:text-left">
           TraceAI memeriksa pola tekstur piksel, anomali pencahayaan, dan metadata EXIF pada foto produk.
         </p>
-        <p className="font-mono text-[11px] text-muted">
-          Riwayat disimpan lokal di peramban ini · Swin Transformer v6
-        </p>
+
+        <div className="flex flex-col items-center gap-2 md:flex-row md:items-center md:gap-3 md:text-right">
+          <p className="text-muted md:text-right">
+            Riwayat pemeriksaan disimpan lokal di peramban perangkat ini · Swin Transformer v6
+          </p>
+
+          {onToggleBgMotion && (
+            <button
+              type="button"
+              onClick={onToggleBgMotion}
+              aria-pressed={bgPaused}
+              aria-label={bgPaused ? 'Aktifkan animasi latar' : 'Jeda animasi latar'}
+              title={bgPaused ? 'Aktifkan animasi latar' : 'Jeda animasi latar'}
+              className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-subtle/70 text-muted transition hover:border-edge hover:bg-subtle hover:text-ink"
+            >
+              {bgPaused ? (
+                <Play className="size-3.5" strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Pause className="size-3.5" strokeWidth={2} aria-hidden="true" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </footer>
   )

@@ -51,16 +51,16 @@ export default function Dropzone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={[
-          'rounded-2xl border bg-card p-4 shadow-card transition sm:p-5',
+          'rounded-2xl border bg-card/95 p-4 shadow-card transition sm:p-5',
           isDragging ? 'border-emerald-brand ring-2 ring-emerald-brand/25' : 'border-line',
         ].join(' ')}
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3.5 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink" title={file.name}>
+            <p className="truncate text-sm font-bold text-ink" title={file.name}>
               {file.name}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-muted">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted tabular-nums">
               <span className="rounded bg-subtle px-1.5 py-0.5 font-semibold text-ink">
                 {formatMimeShort(file.type)}
               </span>
@@ -83,21 +83,21 @@ export default function Dropzone({
           </button>
         </div>
 
-        <div className="forensic-frame grid aspect-[16/10] w-full place-items-center overflow-hidden rounded-xl border border-line bg-inset">
+        <div className="forensic-frame flex h-[250px] w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-stage p-3 sm:h-[320px] sm:p-4">
           <img
             src={previewUrl}
             alt={`Pratinjau ${file.name}`}
             width={dimensions?.width || 800}
             height={dimensions?.height || 500}
             fetchPriority="high"
-            className="max-h-full max-w-full object-contain p-3"
+            className="h-full w-full object-contain animate-zoom-reveal"
           />
         </div>
 
         {isLowRes && (
           <div
             role="status"
-            className="mt-3 flex items-start gap-2.5 rounded-xl border border-warn-border bg-warn-bg px-3.5 py-2.5 text-xs leading-relaxed text-warn-fg"
+            className="mt-3 flex items-start gap-2.5 rounded-xl border border-warn-border bg-warn-bg px-3.5 py-2.5 text-xs leading-relaxed text-warn-fg tabular-nums"
           >
             <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
             <span>
@@ -111,7 +111,7 @@ export default function Dropzone({
           <button
             type="button"
             onClick={onStartScan}
-            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-brand px-5 text-[15px] font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99]"
+            className="inline-flex min-h-12 w-full flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-brand px-5 text-[15px] font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99] sm:w-auto"
           >
             <ScanSearch className="size-4.5 shrink-0" strokeWidth={2.25} aria-hidden="true" />
             <span>Mulai Analisis Forensik</span>
@@ -120,7 +120,7 @@ export default function Dropzone({
           <button
             type="button"
             onClick={onPickGallery}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99] sm:w-auto"
           >
             <RefreshCw className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
             <span>Ganti Gambar</span>
@@ -131,7 +131,7 @@ export default function Dropzone({
   }
 
   return (
-    <div className="rounded-2xl border border-line bg-card p-4 shadow-card sm:p-5">
+    <div className="rounded-2xl border border-line bg-card/95 p-4 shadow-card sm:p-5">
       <div
         role="button"
         tabIndex={0}
@@ -143,10 +143,10 @@ export default function Dropzone({
         onDrop={handleDrop}
         aria-label="Area unggah gambar. Tarik dan lepaskan file gambar ke sini, atau tekan Enter untuk memilih file dari perangkat."
         className={[
-          'forensic-frame flex min-h-60 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition sm:min-h-68',
+          'forensic-frame flex min-h-56 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-7 text-center transition sm:min-h-68 sm:px-6 sm:py-8',
           isDragging
             ? 'border-emerald-brand bg-safe-bg/50'
-            : 'border-edge/60 bg-subtle/60 hover:border-ink hover:bg-subtle',
+            : 'border-edge/60 bg-stage hover:border-ink hover:bg-subtle',
         ].join(' ')}
       >
         <div className="pointer-events-none flex flex-col items-center">
@@ -157,7 +157,7 @@ export default function Dropzone({
             <Upload className="size-5" strokeWidth={2} />
           </span>
 
-          <p className="text-base font-bold text-ink sm:text-lg">
+          <p className="text-base font-bold tracking-[-0.015em] text-ink sm:text-lg">
             {isDragging ? 'Lepaskan file gambar untuk memuat pratinjau' : 'Tarik & lepaskan foto produk ke sini'}
           </p>
 
@@ -165,11 +165,17 @@ export default function Dropzone({
             Klik area ini untuk memilih file dari perangkat, atau tempel langsung dari clipboard (Ctrl+V).
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 font-mono text-xs text-muted">
-            <span className="rounded-md border border-line bg-card px-2 py-1 text-ink">JPG</span>
-            <span className="rounded-md border border-line bg-card px-2 py-1 text-ink">PNG</span>
-            <span className="rounded-md border border-line bg-card px-2 py-1 text-ink">WEBP</span>
-            <span>· Maks. {MAX_FILE_SIZE_MB} MB</span>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-muted tabular-nums">
+            <span className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-ink">
+              JPG
+            </span>
+            <span className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-ink">
+              PNG
+            </span>
+            <span className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-ink">
+              WEBP
+            </span>
+            <span className="font-medium text-muted">· Maks. {MAX_FILE_SIZE_MB} MB</span>
           </div>
         </div>
       </div>
@@ -178,7 +184,7 @@ export default function Dropzone({
         <button
           type="button"
           onClick={onPickGallery}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-action px-4 text-sm font-semibold text-action-fg transition hover:bg-action-hover active:scale-[0.99]"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-action px-4 text-sm font-semibold text-action-fg transition hover:bg-action-hover active:scale-[0.99]"
         >
           <Upload className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
           <span>Pilih File dari Galeri</span>
@@ -187,7 +193,7 @@ export default function Dropzone({
         <button
           type="button"
           onClick={onTakePhoto}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
         >
           <Camera className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
           <span>Ambil Foto Kamera</span>

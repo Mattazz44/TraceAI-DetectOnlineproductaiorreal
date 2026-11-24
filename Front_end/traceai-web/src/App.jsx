@@ -5,6 +5,7 @@ import Footer from './components/Footer.jsx'
 import Header from './components/Header.jsx'
 import HistoryScreen from './components/HistoryScreen.jsx'
 import HomeScreen from './components/HomeScreen.jsx'
+import InteractiveBackground from './components/InteractiveBackground.jsx'
 import { useRecentScans } from './hooks/useRecentScans.js'
 import { useTheme } from './hooks/useTheme.js'
 import { ACCEPTED_TYPES, delay, detectImage, validateImage } from './lib/detect.js'
@@ -12,12 +13,22 @@ import { createThumbnail, formatMimeShort, inspectImageDimensions } from './lib/
 
 const ACCEPT = ACCEPTED_TYPES.join(',')
 const MIN_SCAN_MS = 650
+const BG_MOTION_KEY = 'traceai:bg-paused'
+
+function loadBgPaused() {
+  try {
+    return localStorage.getItem(BG_MOTION_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('landing')
   const [staged, setStaged] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [error, setError] = useState(null)
+  const [bgPaused, setBgPaused] = useState(loadBgPaused)
 
   const { theme, toggleTheme } = useTheme()
   const { scans, addScan, removeScan, clearScans } = useRecentScans()
@@ -25,6 +36,18 @@ export default function App() {
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const abortRef = useRef(null)
+
+  const toggleBgMotion = useCallback(() => {
+    setBgPaused((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(BG_MOTION_KEY, String(next))
+      } catch {
+        /* ignore storage errors */
+      }
+      return next
+    })
+  }, [])
 
   const stagedUrl = staged?.previewUrl
   useEffect(() => {
@@ -282,6 +305,8 @@ export default function App() {
             onTakePhoto={() => cameraInputRef.current?.click()}
             onPickGallery={() => galleryInputRef.current?.click()}
             onSelectScan={handleSelectScan}
+            onRemoveScan={removeScan}
+            onClearScans={clearScans}
             onOpenHistory={() => navigate('history')}
           />
         )
@@ -289,7 +314,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+    <div className="relative isolate flex min-h-dvh flex-col text-ink">
+      <InteractiveBackground theme={theme} paused={bgPaused} />
+
       <Header
         activeScreen={currentScreen}
         scansCount={scans.length}
@@ -305,7 +332,7 @@ export default function App() {
         {renderScreen()}
       </main>
 
-      <Footer />
+      <Footer bgPaused={bgPaused} onToggleBgMotion={toggleBgMotion} />
 
       <input
         ref={cameraInputRef}

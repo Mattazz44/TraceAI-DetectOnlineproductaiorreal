@@ -1,4 +1,5 @@
 import { Clock, Moon, ScanSearch, Sun } from 'lucide-react'
+import TraceLogo from './TraceLogo.jsx'
 
 export default function Header({
   activeScreen = 'landing',
@@ -20,43 +21,38 @@ export default function Header({
   }
 
   return (
-    <header className="border-b border-line bg-card/85 backdrop-blur-xs">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-30 border-b border-line bg-card/90 backdrop-blur-xs">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
         <a
           href="#pemeriksaan"
           onClick={handleBrandClick}
-          className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-ink transition hover:opacity-85"
+          className="group inline-flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-xl px-1 text-ink transition hover:opacity-90 sm:gap-2.5"
           aria-label="TraceAI, kembali ke halaman pemeriksaan"
         >
-          <span
-            aria-hidden="true"
-            className="grid size-8 shrink-0 place-items-center rounded-lg border border-edge/50 bg-subtle font-mono text-xs font-semibold text-ink"
-          >
-            T
-          </span>
+          <TraceLogo className="size-8 shrink-0 transition-transform duration-200 group-hover:scale-[1.03] sm:size-9" />
           <span className="flex flex-col">
-            <span className="text-base leading-none font-extrabold tracking-tight text-ink sm:text-[17px]">
+            <span className="text-base leading-none font-extrabold tracking-[-0.03em] text-ink sm:text-lg">
               TraceAI
             </span>
-            <span className="mt-0.5 hidden text-[11px] leading-none text-muted sm:inline">
+            <span className="mt-1 hidden text-[11px] leading-none font-medium text-muted sm:inline">
               Forensik Keaslian Gambar
             </span>
           </span>
         </a>
 
-        <nav aria-label="Navigasi utama" className="flex items-center gap-1.5 sm:gap-2">
+        <nav aria-label="Navigasi utama" className="flex shrink-0 items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={onNavigateHome}
             aria-current={isInspectionActive ? 'page' : undefined}
             className={[
-              'inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition sm:px-3.5',
+              'inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:text-sm',
               isInspectionActive
                 ? 'bg-action text-action-fg'
                 : 'border border-transparent text-muted hover:border-line hover:bg-subtle hover:text-ink',
             ].join(' ')}
           >
-            <ScanSearch className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <ScanSearch className="hidden size-4 shrink-0 sm:inline-block" strokeWidth={2} aria-hidden="true" />
             <span>Pemeriksaan</span>
           </button>
 
@@ -65,18 +61,18 @@ export default function Header({
             onClick={onNavigateHistory}
             aria-current={isHistoryActive ? 'page' : undefined}
             className={[
-              'inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition sm:px-3.5',
+              'inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:text-sm',
               isHistoryActive
                 ? 'bg-action text-action-fg'
                 : 'border border-transparent text-muted hover:border-line hover:bg-subtle hover:text-ink',
             ].join(' ')}
           >
-            <Clock className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <Clock className="hidden size-4 shrink-0 sm:inline-block" strokeWidth={2} aria-hidden="true" />
             <span>Riwayat</span>
             {scansCount > 0 && (
               <span
                 className={[
-                  'rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums',
+                  'rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums sm:text-xs',
                   isHistoryActive ? 'bg-action-fg/20 text-action-fg' : 'bg-subtle text-ink',
                 ].join(' ')}
               >

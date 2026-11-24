@@ -12,22 +12,24 @@ export default function HomeScreen({
   onTakePhoto,
   onPickGallery,
   onSelectScan,
+  onRemoveScan,
+  onClearScans,
   onOpenHistory,
 }) {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10 animate-fade-in">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10 animate-fade-in">
       <div className="max-w-3xl">
-        <h1 className="text-2xl leading-tight font-extrabold tracking-tight text-balance text-ink sm:text-3xl lg:text-[2.25rem]">
+        <h1 className="text-2xl leading-[1.18] font-extrabold tracking-[-0.03em] text-balance text-ink sm:text-3xl lg:text-[2.35rem]">
           Periksa keaslian foto produk sebelum membeli atau mempublikasikan
         </h1>
-        <p className="mt-2.5 text-sm leading-relaxed text-muted sm:text-base">
+        <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
           Unggah foto katalog, ulasan, atau iklan untuk mendeteksi jejak generator gambar sintetis,
           meninjau area visual yang janggal, dan membaca metadata perangkat asli.
         </p>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:mt-8 lg:grid-cols-12 lg:gap-8">
-        <div className="space-y-4 lg:col-span-7">
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 md:grid-cols-12 md:gap-7 lg:mt-8 lg:gap-8">
+        <div className="space-y-4 md:col-span-7">
           <Dropzone
             staged={staged}
             onStageFile={onStageFile}
@@ -51,7 +53,7 @@ export default function HomeScreen({
                 <button
                   type="button"
                   onClick={onStartScan}
-                  className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-ai-border bg-card px-3.5 text-xs font-semibold text-ink transition hover:bg-subtle"
+                  className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-ai-border bg-card px-3.5 text-xs font-semibold text-ink transition hover:bg-subtle sm:w-auto"
                 >
                   <RotateCcw className="size-3.5" strokeWidth={2} aria-hidden="true" />
                   <span>Coba Lagi</span>
@@ -62,7 +64,7 @@ export default function HomeScreen({
 
           <section
             aria-labelledby="accuracy-note-heading"
-            className="rounded-2xl border border-line bg-subtle/60 p-4"
+            className="rounded-2xl border border-line bg-card/90 p-4 shadow-card"
           >
             <h2 id="accuracy-note-heading" className="text-sm font-bold text-ink">
               Panduan akurasi pemeriksaan
@@ -75,11 +77,13 @@ export default function HomeScreen({
           </section>
         </div>
 
-        <div className="lg:col-span-5">
+        <div className="md:col-span-5">
           <RecentScans
             scans={scans}
             limit={5}
             onSelect={onSelectScan}
+            onRemove={onRemoveScan}
+            onClearAll={onClearScans}
             onSeeAll={onOpenHistory}
           />
         </div>

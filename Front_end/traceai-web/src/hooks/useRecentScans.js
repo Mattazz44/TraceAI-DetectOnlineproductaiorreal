@@ -45,7 +45,15 @@ export function useRecentScans() {
     setScans((prev) => prev.filter((s) => s.id !== id))
   }, [])
 
-  const clearScans = useCallback(() => setScans([]), [])
+  const clearScans = useCallback(() => {
+    setScans([])
+    try {
+      localStorage.removeItem(LEGACY_KEY)
+      localStorage.setItem(STORAGE_KEY, '[]')
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [])
 
   return { scans, addScan, removeScan, clearScans }
 }
