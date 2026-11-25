@@ -1,135 +1,167 @@
-# TraceAi — Panduan Instalasi & Cara Pakai Aplikasi
+# TraceAI
 
-**TraceAi** adalah aplikasi web deteksi keaslian gambar produk yang membantu pengguna memeriksa apakah foto produk (katalog, iklan, atau ulasan) merupakan **foto asli kamera** atau **buatan generator AI**.
-
-Dokumen ini berisi panduan lengkap **cara menjalankan proyek (Developer Guide)** serta **cara menggunakan fitur-fitur di dalam aplikasi (User Guide)**.
+TraceAI adalah aplikasi web forensik citra untuk memeriksa apakah foto produk pada katalog, ulasan, atau materi iklan berasal dari tangkapan kamera asli atau hasil generator gambar sintetis. Aplikasi ini menggabungkan klasifikasi berbasis Swin Transformer, pemetaan area aktivasi Grad-CAM, dan pembacaan metadata EXIF ke dalam antarmuka pemeriksaan yang mudah dipahami pengguna umum maupun tim penguji kualitas.
 
 ---
 
-## Struktur Folder Proyek
+## Arsitektur dan Spesifikasi Teknis
+
+Proyek ini terbagi menjadi dua layanan yang berjalan terpisah:
+
+1. Layanan Backend berbasis Python dan FastAPI yang menangani validasi biner gambar, prapemrosesan citra, inferensi model, ekstraksi atribut kamera EXIF, serta pembuatan peta panas (heatmap) Grad-CAM.
+2. Aplikasi Frontend berbasis React 18, Vite 6, dan Tailwind CSS v4 yang menyediakan alur pratinjau berkas, visualisasi skor terkalibrasi, inspeksi detail hingga perbesaran 300%, dan penyimpanan riwayat lokal di peramban.
+
+| Komponen | Spesifikasi Aktif |
+| :--- | :--- |
+| Arsitektur model utama | `SwinForImageClassification` (fine-tuned dari `Organika/sdxl-detector`) |
+| Versi bobot | `v6_product_matched_antiforgetting_fp16` (`model.safetensors`) |
+| Kelas keluaran | `0: NON_AI`, `1: AI_GENERATED` |
+| Prapemrosesan input | `224 x 224 px` dengan metode `center_crop_fit` (interpolasi Bicubic) |
+| Test-Time Augmentation (TTA) | Aktif (rata-rata probabilitas citra asli dan cerminan horizontal) |
+| Ambang keputusan AI | `0.65` (`65.0%`) |
+| Lokalisasi visual | Grad-CAM pada stage terakhir Swin (`7 x 7`) yang diproyeksikan ke rasio asli |
+| Model cadangan otomatis | `EfficientNet-B0` (`.pth`) jika `model.safetensors` tidak ditemukan |
+| Batas unggahan berkas | Format `JPG`, `PNG`, dan `WebP`, ukuran maksimal `10 MB` |
+
+---
+
+## Struktur Direktori
 
 ```text
 Project viskom trace ai/
-├── Backend/                  # Server API FastAPI (Python) & ekstraksi EXIF
-│   ├── main.py               # Entry point endpoint /api/v1/scan
-│   ├── requirements.txt      # Daftar dependensi Python
-│   ├── ai_pipeline.md        # Dokumentasi arsitektur & aturan skor AI
-│   ├── backend_rules.md      # Aturan keamanan & kontrak API
-│   └── DEPLOYMENT_AND_ENV.md # Panduan environment & deployment
+├── Backend/
+│   ├── models/
+│   │   ├── model.safetensors          # Bobot utama Swin Transformer v6
+│   │   ├── config.json                # Konfigurasi arsitektur dan pemetaan label
+│   │   ├── preprocessor_config.json   # Parameter normalisasi dan ukuran citra
+│   │   └── traceai_config_final.json  # Konfigurasi ambang 0.65, TTA, dan prapemrosesan
+│   ├── main.py                        # Server FastAPI, inferensi, Grad-CAM, dan EXIF
+│   ├── requirements.txt               # Daftar paket Python
+│   ├── ai_pipeline.md                 # Dokumentasi alur inferensi model
+│   ├── backend_rules.md               # Aturan validasi dan kontrak respons API
+│   └── DEPLOYMENT_AND_ENV.md          # Catatan konfigurasi lingkungan server
 ├── Front_end/
-│   ├── front_end_guide.md    # Spesifikasi awal antarmuka Front-End
-│   └── traceai-web/          # Aplikasi Web React + Vite + Tailwind CSS v4
-│       ├── src/              # Komponen halaman (Home, Analysis, Evidence, History)
-│       ├── .env.example      # Contoh konfigurasi environment variabel
-│       └── package.json      # Konfigurasi dependensi Node.js
-├── PRD.md                    # Product Requirements Document (PRD) lengkap
-└── README.md                 # Panduan instalasi & cara pakai aplikasi (file ini)
+│   └── traceai-web/
+│       ├── public/
+│       │   └── logo/logo.jpeg         # Aset logo resmi dan ikon tab peramban
+│       ├── src/
+│       │   ├── components/            # Komponen layar, Dropzone, Lightbox, dan navigasi
+│       │   ├── hooks/                 # Hook tema Terang/Gelap dan penyimpanan riwayat
+│       │   ├── lib/                   # Klien API, normalisasi skor, dan utilitas citra
+│       │   ├── App.jsx                # Pengatur alur layar dan pintasan papan klip
+│       │   └── index.css              # Token warna tema dan aturan tipografi Tailwind v4
+│       ├── index.html                 # Dokumen utama dan inisialisasi tema bebas kedip
+│       └── package.json               # Konfigurasi skrip dan paket Node.js
+├── logo/
+│   └── logo.jpeg                      # Sumber aset logo proyek
+├── PRD.md                             # Dokumen kebutuhan produk
+└── README.md                          # Dokumentasi instalasi dan penggunaan aplikasi
 ```
 
 ---
 
-## Bagian 1: Cara Menjalankan Aplikasi di Komputer (Lokal)
+## Menjalankan Proyek Secara Lokal
 
-### Prasyarat (Prerequisites)
-* **Node.js** (versi 18 atau lebih baru) & `npm`
-* **Python** (versi 3.10 atau lebih baru)
+### Prasyarat
 
----
+- Python versi 3.10 atau lebih baru
+- Node.js versi 18 atau lebih baru beserta `npm`
+- Berkas model (`model.safetensors`, `config.json`, `preprocessor_config.json`, dan `traceai_config_final.json`) tersedia di dalam folder `Backend/models/`
 
-### Langkah 1 — Menyalakan Server Back-End (Terminal 1)
+### 1. Menjalankan Server Backend (Terminal 1)
 
-1. Buka terminal dan masuk ke folder `Backend`:
-   ```powershell
-   cd Backend
-   ```
-2. Buat dan aktifkan *virtual environment* Python (jika belum ada):
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-   *(Untuk pengguna Mac/Linux gunakan: `source venv/bin/activate`)*
-3. Instal seluruh library Python yang dibutuhkan:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-4. Jalankan server FastAPI di port `8000`:
-   ```powershell
-   uvicorn main:app --reload --port 8000
-   ```
-   * Server Back-End aktif di: **`http://localhost:8000`**
-   * Dokumentasi interaktif (Swagger UI) dapat dibuka di: **`http://localhost:8000/docs`**
+Masuk ke direktori `Backend`, buat dan aktifkan lingkungan virtual Python, pasang dependensi, lalu nyalakan server FastAPI pada port `8000`:
 
----
+```powershell
+cd Backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
 
-### Langkah 2 — Menyalakan Aplikasi Front-End (Terminal 2)
+Untuk pengguna macOS atau Linux, aktifkan lingkungan virtual dengan perintah `source venv/bin/activate`.
 
-1. Buka **terminal baru** (biarkan Terminal 1 tetap menyala), lalu masuk ke folder `Front_end/traceai-web`:
-   ```powershell
-   cd "Front_end\traceai-web"
-   ```
-2. Instal paket dependensi Front-End:
-   ```powershell
-   npm install
-   ```
-3. Pastikan file `.env` sudah ada di dalam folder `Front_end/traceai-web` (atau salin dari `.env.example`):
-   ```env
-   VITE_API_BASE_URL=http://localhost:8000/api/v1
-   VITE_MAX_UPLOAD_MB=10
-   ```
-4. Jalankan server pengembangan Vite:
-   ```powershell
-   npm run dev
-   ```
-5. Buka browser dan akses alamat yang muncul: **`http://localhost:5173`**
+Setelah proses pemuatan bobot selesai:
+- Endpoint status server dapat diperiksa di `http://127.0.0.1:8000/`
+- Dokumentasi skema OpenAPI tersedia di `http://127.0.0.1:8000/docs`
+
+### 2. Menjalankan Aplikasi Frontend (Terminal 2)
+
+Buka jendela terminal baru, masuk ke direktori `Front_end/traceai-web`, pasang paket Node.js, dan jalankan server pengembangan Vite:
+
+```powershell
+cd "Front_end\traceai-web"
+npm install
+npm run dev
+```
+
+Secara bawaan aplikasi terhubung ke `http://localhost:8000/api/v1` dengan batas unggahan `10 MB`. Jika alamat server Backend diubah, buat berkas `.env` di dalam `Front_end/traceai-web`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_MAX_UPLOAD_MB=10
+```
+
+Buka `http://localhost:5173` (atau `http://127.0.0.1:5173`) pada peramban untuk menggunakan aplikasi. Untuk membuat bundel produksi statis, jalankan `npm run build`.
 
 ---
 
-## Bagian 2: Cara Menggunakan Aplikasi (Panduan Pengguna)
+## Ringkasan Endpoint API
 
-### 1. Mengunggah atau Memotret Gambar Produk (Halaman Utama)
-Saat pertama kali membuka aplikasi, Anda berada di **Halaman Utama**:
-* **Drag & Drop / Klik Kotak Putus-Putus:** Tarik file gambar produk (`JPG`, `PNG`, atau `WebP`, maks. 10 MB) langsung ke dalam kotak **"Taruh gambar di sini"**.
-* **Tombol "Ambil foto":** Jika dibuka dari HP, tombol hijau neon ini akan langsung membuka kamera belakang HP untuk memotret produk secara langsung.
-* **Tombol "Pilih dari galeri":** Membuka galeri foto atau File Explorer untuk memilih gambar.
-* **Paste Cepat (`Ctrl + V`):** Di laptop/PC, Anda juga bisa menyalin gambar (*Copy Image*) lalu langsung menekan `Ctrl + V` di halaman utama.
+| Metode | Jalur | Fungsi |
+| :--- | :--- | :--- |
+| `GET` | `/` | Mengembalikan status server, arsitektur model aktif, metode prapemrosesan, status TTA, dan nilai ambang deteksi. |
+| `POST` | `/api/v1/scan` | Menerima berkas gambar melalui `multipart/form-data` (field `image`) dan mengembalikan skor probabilitas, status keaslian, koordinat area anomali, peta panas base64, rincian empat indikator, serta metadata berkas dan kamera. |
 
-> **Tips Akurasi:** Gunakan file gambar ukuran asli. Hindari menggunakan hasil *screenshot* atau gambar yang sudah dikompres berulang kali lewat aplikasi chat karena metadata kamera aslinya bisa hilang.
-
----
-
-### 2. Membaca Hasil Analisis (Halaman Hasil Scan)
-Begitu gambar dipilih, aplikasi akan menampilkan animasi pemindaian laser hijau (**"Menganalisis gambar…"**), lalu menampilkan hasil:
-* **Skor Kemungkinan Buatan AI (`0% – 100%`):**
-  * 🟠 **`75% – 100%` (AI Tinggi):** Gambar sangat mungkin dihasilkan oleh generator AI.
-  * 🟡 **`40% – 74%` (Belum Pasti):** Gambar memiliki indikasi manipulasi atau terkompresi berat.
-  * 🟢 **`0% – 39%` (AI Rendah):** Gambar kemungkinan besar merupakan foto produk asli.
-* **Keyakinan Model (`Rendah` / `Sedang` / `Tinggi`):** Menunjukkan seberapa yakin detektor terhadap kesimpulan tersebut.
-* Di bagian bawah layar terdapat dua tombol:
-  * **"Scan lagi"**: Kembali ke halaman utama untuk memeriksa gambar lain.
-  * **"Lihat bukti"**: Membuka rincian bukti forensik pada gambar.
+Kode respons HTTP pada `/api/v1/scan`:
+- `200 OK`: Pemeriksaan berhasil dijalankan.
+- `400 Bad Request`: Berkas kosong atau struktur biner gambar rusak.
+- `413 Content Too Large`: Ukuran berkas melampaui batas 10 MB.
+- `415 Unsupported Media Type`: Format berkas di luar `image/jpeg`, `image/png`, atau `image/webp`.
+- `500 Internal Server Error`: Gangguan internal saat menjalankan inferensi model.
 
 ---
 
-### 3. Memeriksa Rincian Forensik & Membagikan Hasil (Halaman Bukti Temuan)
-Saat Anda menekan tombol **"Lihat bukti"**, Anda akan melihat:
-* **Gambar dengan Penanda "Area janggal":** Kotak berwarna oranye menandai area visual pada gambar yang memiliki anomali tekstur atau teks.
-* **4 Kartu Pemeriksaan Forensik:**
-  1. **Tekstur permukaan** — Apakah permukaan objek terlalu mulus/halus khas AI atau memiliki *noise* kamera alami.
-  2. **Teks dan logo** — Apakah tulisan pada kemasan terbaca jelas atau terdistorsi.
-  3. **Cahaya dan bayangan** — Apakah arah bayangan konsisten dengan sumber cahaya.
-  4. **Metadata** — Apakah ditemukan data kamera fisik (EXIF seperti merek/tipe kamera) atau tanda kriptografi C2PA.
-* **Tips Interaktif:** Ketuk salah satu kartu pemeriksaan (atau ketuk kotak oranye pada gambar) untuk membuka tips cara mengecek kejanggalan tersebut secara manual beserta sorotan area terkait.
-* **Tombol "Bagikan hasil":**
-  * **Di HP:** Membuka menu *Share* bawaan HP untuk mengirim hasil langsung ke WhatsApp, Telegram, X, atau Instagram.
-  * **Di Laptop/PC:** Menyalin teks ringkasan hasil & tautan secara otomatis ke *clipboard* (tinggal `Ctrl + V` di aplikasi chat).
-* **Tombol "Kembali ke layar utama":** Langsung kembali ke halaman awal untuk melakukan scan baru.
+## Panduan Penggunaan Aplikasi
+
+### 1. Memilih dan Meninjau Pratinjau Gambar
+
+Pada halaman `Pemeriksaan`, masukkan foto produk melalui salah satu cara berikut:
+- Tarik dan lepaskan berkas gambar ke dalam bingkai unggah.
+- Tekan tombol `Pilih File dari Galeri` untuk memilih berkas dari perangkat.
+- Tekan tombol `Ambil Foto Kamera` pada perangkat seluler untuk memotret produk secara langsung.
+- Salin gambar dari sumber lain lalu tekan `Ctrl+V` di halaman aplikasi.
+
+Sebelum gambar dikirim ke server, aplikasi menampilkan pratinjau utuh beserta format berkas, ukuran byte, dimensi piksel asli, dan peringatan jika resolusi berada di bawah `256 x 256 px`. Tekan `Mulai Analisis Forensik` untuk memulai pemeriksaan atau `Ganti Gambar` untuk memilih berkas lain.
+
+### 2. Membaca Ringkasan Hasil Pemeriksaan
+
+Setelah inferensi selesai, halaman hasil menyajikan:
+- Kesimpulan utama dalam bahasa yang jelas (`Kemungkinan Besar Gambar Asli`, `Kemungkinan Gambar Asli`, `Terindikasi Buatan AI atau Manipulasi`, atau `Terdeteksi Kuat Buatan AI`).
+- Perbandingan berdampingan antara `Skor Indikasi Buatan AI` dan `Skor Keaslian Foto`, dilengkapi bilah pengukur dengan penanda `Ambang AI: 65%`. Gambar dengan skor di bawah 65% diklasifikasikan sebagai foto asli, sedangkan skor 65% ke atas ditandai sebagai indikasi sintetis.
+- Indikator `Keyakinan Keputusan Model` (`50%` sampai `100%`) yang dihitung berdasarkan jarak skor terhadap ambang 65%.
+- Kartu `Ringkasan Teknis File & Mesin` yang memuat resolusi piksel, format dan ukuran berkas, ringkasan ketersediaan EXIF, serta konfigurasi mesin inferensi.
+- Fitur klik gambar atau tombol `Perbesar` untuk membuka jendela inspeksi penuh (`100%` hingga `300%`) guna memeriksa detail permukaan produk.
+
+### 3. Memeriksa Bukti Visual dan Metadata
+
+Tekan tombol `Buka Bukti & Metadata` untuk meninjau dasar keputusan model secara rinci:
+- Panel visual di sisi kiri menampilkan foto produk secara utuh bersama sakelar `Peta Panas` (area fokus aktivasi model) dan `Kotak Area` (sorotan titik anomali tertinggi). Kedua lapisan tersebut tetap tersedia saat gambar diperbesar ke layar penuh.
+- Tab `Indikator Visual` merinci empat aspek pemeriksaan: tekstur permukaan, teks dan detail logo, cahaya dan bayangan, serta metadata perangkat (EXIF). Setiap kartu dapat dibuka untuk membaca panduan pemeriksaan mata telanjang dan terhubung langsung dengan kotak sorotan pada gambar.
+- Tab `Metadata & Parameter` menampilkan tabel atribut berkas asli (dimensi, ukuran, merek/model kamera, perangkat lunak penyunting, waktu pengambilan) serta parameter model yang digunakan pada sesi tersebut.
+- Tombol `Salin & Bagikan Laporan` membuka lembar berbagi bawaan pada ponsel atau menyalin ringkasan teks laporan ke papan klip pada komputer.
+
+### 4. Mengelola Riwayat dan Preferensi Tampilan
+
+- Seluruh hasil pemeriksaan disimpan secara lokal pada `localStorage` peramban (hingga 50 laporan terbaru) tanpa basis data eksternal.
+- Buka menu `Riwayat` pada bilah atas untuk mencari nama berkas, menyaring daftar berdasarkan status (`Semua`, `Terdeteksi AI`, `Gambar Asli`), atau mengganti tata letak antara tampilan daftar dan kartu grid.
+- Gunakan ikon tempat sampah pada baris item untuk menghapus satu riwayat tertentu, atau gunakan tombol `Hapus Semua` untuk mengosongkan seluruh daftar setelah konfirmasi.
+- Gunakan tombol ikon matahari/bulan di kanan atas untuk berpindah antara mode Terang dan mode Gelap, serta tombol jeda di sudut kanan bawah halaman jika ingin menghentikan gerak latar belakang.
 
 ---
 
-### 4. Melihat & Mencari Riwayat Pemindaian (Halaman Riwayat Scan)
-* Klik **ikon Jam (`🕒`)** di pojok kanan atas halaman utama (atau tombol **"Lihat semua"** pada bagian *Terakhir di-scan*).
-* **Kotak Pencarian:** Ketik nama file atau produk untuk mencari riwayat tertentu.
-* **Tombol Filter (`Semua` | `AI tinggi` | `AI rendah`):** Saring daftar riwayat berdasarkan hasil deteksinya.
-* **Buka Ulang Hasil:** Ketuk salah satu baris riwayat untuk melihat kembali skor, gambar pratinjau, dan bukti temuannya tanpa perlu mengunggah ulang file.
-* **Tombol "Scan produk baru":** Kembali ke halaman utama untuk memindai produk baru.
+## Catatan Batasan Pemeriksaan
 
+- Aplikasi pesan instan (seperti WhatsApp dan Telegram) serta sebagian besar platform lokapasar mengompresi ulang gambar dan menghapus tag EXIF saat foto diunggah. Ketiadaan metadata kamera pada berkas semacam itu wajar terjadi dan bukan bukti tunggal bahwa gambar dibuat oleh AI.
+- Tangkapan layar (screenshot), kolase berbingkai teks, atau foto beresolusi sangat rendah memiliki detail tekstur sensor yang terbatas sehingga akurasi pemisahan kelas dapat menurun dibanding berkas foto asli dari perangkat kamera.
