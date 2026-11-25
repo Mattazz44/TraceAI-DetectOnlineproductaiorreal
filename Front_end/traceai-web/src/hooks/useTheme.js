@@ -25,7 +25,7 @@ export function useTheme() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     const meta = document.getElementById('meta-theme-color')
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0E1210' : '#F6F7F5')
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B0F17' : '#F5F7FA')
     try {
       localStorage.setItem(THEME_KEY, theme)
     } catch {

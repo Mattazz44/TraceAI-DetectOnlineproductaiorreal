@@ -8,13 +8,15 @@ export default function ScanThumb({ scan, size = 'md' }) {
 
   if (scan?.thumbnail) {
     return (
-      <div className={`${dimensions.box} shrink-0 overflow-hidden border border-line bg-inset`}>
+      <div
+        className={`${dimensions.box} shrink-0 overflow-hidden border border-line bg-inset transition-colors duration-300`}
+      >
         <img
           src={scan.thumbnail}
           alt=""
           width={dimensions.px}
           height={dimensions.px}
-          className="size-full object-cover"
+          className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       </div>
     )
@@ -22,7 +24,7 @@ export default function ScanThumb({ scan, size = 'md' }) {
 
   return (
     <div
-      className={`${dimensions.box} grid shrink-0 place-items-center border border-line bg-subtle text-muted`}
+      className={`${dimensions.box} grid shrink-0 place-items-center border border-line bg-subtle text-muted transition-colors duration-300`}
       aria-hidden="true"
     >
       <ImageIcon className={dimensions.icon} strokeWidth={1.75} />

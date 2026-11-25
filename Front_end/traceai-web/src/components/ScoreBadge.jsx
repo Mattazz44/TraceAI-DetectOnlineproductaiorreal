@@ -19,7 +19,7 @@ export default function ScoreBadge({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-lg border font-semibold ${sizeClasses} ${verdict.pillClass}`}
+      className={`inline-flex shrink-0 items-center rounded-lg border font-semibold transition-colors duration-300 ${sizeClasses} ${verdict.pillClass}`}
       title={`${verdict.badge} (${probability}% skor AI)`}
       aria-label={`${verdict.badge}, skor AI ${probability} persen`}
     >

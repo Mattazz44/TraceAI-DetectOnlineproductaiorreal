@@ -175,7 +175,7 @@ export default function EvidenceScreen({ scan, onBack, onHome }) {
               type="button"
               onClick={handleShare}
               aria-busy={isSharing}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover active:scale-[0.99]"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-[1px] hover:bg-emerald-brand-hover active:scale-95"
             >
               {copied ? (
                 <>
@@ -193,7 +193,7 @@ export default function EvidenceScreen({ scan, onBack, onHome }) {
             <button
               type="button"
               onClick={onHome}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card/95 px-4 text-sm font-semibold text-ink transition hover:bg-subtle active:scale-[0.99]"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card/95 px-4 text-sm font-semibold text-ink transition-all duration-200 hover:-translate-y-[1px] hover:bg-subtle active:scale-95"
             >
               <RotateCcw className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
               <span>Periksa Gambar Baru</span>

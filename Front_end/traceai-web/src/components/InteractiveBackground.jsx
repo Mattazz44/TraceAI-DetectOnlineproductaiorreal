@@ -2,11 +2,16 @@ import { useEffect, useRef } from 'react'
 
 /**
  * Lightweight halftone / dithered matrix canvas backdrop.
- * Renders subtle geometric dots, plus signs, and diagonal crosses in soft slate/blue
- * tones that respond smoothly to mouse movement, touch drag, and a slow ambient wave.
+ * Smoothly blends palette when switching between Light and Dark themes,
+ * and reacts to mouse movement, touch gestures, and a gentle ambient wave.
  */
 export default function InteractiveBackground({ theme = 'light', paused = false }) {
   const canvasRef = useRef(null)
+  const themeRef = useRef(theme)
+
+  useEffect(() => {
+    themeRef.current = theme
+  }, [theme])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -27,6 +32,8 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
     let rafId = null
     let hidden = document.hidden
 
+    let darkMix = themeRef.current === 'dark' ? 1 : 0
+
     const pointer = {
       targetX: -9999,
       targetY: -9999,
@@ -36,9 +43,10 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
       targetStrength: 0,
     }
 
-    const isDark = theme === 'dark'
-    const baseRgb = isDark ? [126, 166, 201] : [71, 101, 130]
-    const activeRgb = isDark ? [96, 165, 250] : [37, 99, 235]
+    const lightBase = [71, 85, 105]
+    const darkBase = [148, 163, 184]
+    const lightActive = [11, 110, 79]
+    const darkActive = [52, 211, 153]
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -61,7 +69,9 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
     const drawFrame = (timeMs) => {
       ctx.clearRect(0, 0, width, height)
 
-      // Smoothly interpolate pointer position and intensity for soft trails.
+      const targetDark = themeRef.current === 'dark' ? 1 : 0
+      darkMix += (targetDark - darkMix) * 0.14
+
       if (pointer.targetStrength > 0) {
         if (pointer.x < -5000) {
           pointer.x = pointer.targetX
@@ -72,6 +82,14 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
         }
       }
       pointer.strength += (pointer.targetStrength - pointer.strength) * 0.1
+
+      const baseR = lightBase[0] + (darkBase[0] - lightBase[0]) * darkMix
+      const baseG = lightBase[1] + (darkBase[1] - lightBase[1]) * darkMix
+      const baseB = lightBase[2] + (darkBase[2] - lightBase[2]) * darkMix
+
+      const actR = lightActive[0] + (darkActive[0] - lightActive[0]) * darkMix
+      const actG = lightActive[1] + (darkActive[1] - lightActive[1]) * darkMix
+      const actB = lightActive[2] + (darkActive[2] - lightActive[2]) * darkMix
 
       const t = prefersReduced || paused ? 0 : timeMs * 0.00055
       const radius = width < 768 ? 135 : 175
@@ -84,7 +102,6 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
         for (let c = 0; c < cols; c++) {
           const x = offsetX + c * spacing
 
-          // Slow ambient diagonal wave keeps the surface subtly alive on touchscreens.
           const waveA = Math.sin(c * 0.28 + r * 0.19 + t)
           const waveB = Math.cos(c * 0.14 - r * 0.24 + t * 0.72)
           const ambient = (waveA * 0.55 + waveB * 0.45 + 1) * 0.5
@@ -100,15 +117,15 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
             }
           }
 
-          const energy = Math.min(1, ambient * 0.52 + prox * 0.92)
+          const energy = Math.min(1, ambient * 0.5 + prox * 0.94)
           const blend = Math.min(1, prox * 1.15)
 
-          const red = Math.round(baseRgb[0] + (activeRgb[0] - baseRgb[0]) * blend)
-          const green = Math.round(baseRgb[1] + (activeRgb[1] - baseRgb[1]) * blend)
-          const blue = Math.round(baseRgb[2] + (activeRgb[2] - baseRgb[2]) * blend)
+          const red = Math.round(baseR + (actR - baseR) * blend)
+          const green = Math.round(baseG + (actG - baseG) * blend)
+          const blue = Math.round(baseB + (actB - baseB) * blend)
 
-          const minAlpha = isDark ? 0.08 : 0.075
-          const maxAlpha = isDark ? 0.34 : 0.28
+          const minAlpha = 0.07 + darkMix * 0.015
+          const maxAlpha = 0.27 + darkMix * 0.07
           const alpha = minAlpha + energy * (maxAlpha - minAlpha)
           const color = `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(3)})`
 
@@ -162,6 +179,7 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
     const startLoop = () => {
       stopLoop()
       if (prefersReduced || paused) {
+        darkMix = themeRef.current === 'dark' ? 1 : 0
         drawFrame(0)
         return
       }
@@ -227,6 +245,34 @@ export default function InteractiveBackground({ theme = 'light', paused = false 
       window.removeEventListener('touchcancel', handleTouchEnd)
       document.removeEventListener('visibilitychange', handleVisibility)
       motionQuery?.removeEventListener?.('change', handleMotionChange)
+    }
+  }, [paused])
+
+  useEffect(() => {
+    // Redraw static frame immediately on theme switch when animation is paused or reduced.
+    if (!paused && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const isDark = theme === 'dark'
+    const base = isDark ? [148, 163, 184] : [71, 85, 105]
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const spacing = w < 768 ? 26 : 28
+    const cols = Math.ceil(w / spacing) + 1
+    const rows = Math.ceil(h / spacing) + 1
+    const ox = (w - (cols - 1) * spacing) / 2
+    const oy = (h - (rows - 1) * spacing) / 2
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, ${isDark ? 0.14 : 0.12})`
+    for (let r = 0; r < rows; r++) {
+      const y = oy + r * spacing
+      for (let c = 0; c < cols; c++) {
+        ctx.beginPath()
+        ctx.arc(ox + c * spacing, y, 1.25, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
   }, [theme, paused])
 

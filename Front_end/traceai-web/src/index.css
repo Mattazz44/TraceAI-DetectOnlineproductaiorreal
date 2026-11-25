@@ -5,78 +5,82 @@
 :root,
 [data-theme='light'] {
   color-scheme: light;
-  --surface-canvas: #f6f7f5;
+  --surface-canvas: #f5f7fa;
   --surface-card: #ffffff;
-  --surface-subtle: #edf0ec;
-  --surface-inset: #e4e9e5;
-  --surface-stage: #eff2ee;
-  --text-primary: #111513;
-  --text-secondary: #47524c;
-  --border-subtle: #d5dcd7;
-  --border-strong: #6e7c74;
+  --surface-subtle: #eef2f6;
+  --surface-inset: #e2e8f0;
+  --surface-stage: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-subtle: #dce3ec;
+  --border-strong: #64748b;
 
-  --action-bg: #111513;
+  --action-bg: #0f172a;
   --action-fg: #ffffff;
-  --action-hover: #242b27;
+  --action-hover: #1e293b;
 
-  --accent-emerald: #0d6e42;
-  --accent-emerald-hover: #0a5835;
+  --accent-emerald: #0b6e4f;
+  --accent-emerald-hover: #08583f;
 
-  --status-safe-bg: #ddf5e8;
-  --status-safe-fg: #0b5d37;
+  --status-safe-bg: #dcfce7;
+  --status-safe-fg: #065f46;
   --status-safe-border: #86efac;
-  --status-safe-bar: #0d8a52;
+  --status-safe-bar: #10b981;
 
-  --status-ai-bg: #fdece7;
-  --status-ai-fg: #9e2a0e;
-  --status-ai-border: #f5b5a3;
-  --status-ai-bar: #c93b18;
+  --status-ai-bg: #fee2e2;
+  --status-ai-fg: #991b1b;
+  --status-ai-border: #fca5a5;
+  --status-ai-bar: #dc2626;
 
   --status-warn-bg: #fef3c7;
-  --status-warn-fg: #7c4800;
+  --status-warn-fg: #92400e;
   --status-warn-border: #fcd34d;
-  --status-warn-bar: #c27803;
+  --status-warn-bar: #d97706;
 
-  --reticle-color: #47524c;
-  --elev-card: 0 1px 2px rgb(17 21 19 / 0.04), 0 8px 24px -12px rgb(17 21 19 / 0.08);
+  --reticle-color: #64748b;
+  --reticle-active: #0b6e4f;
+  --elev-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -12px rgb(15 23 42 / 0.09);
+  --elev-card-hover: 0 4px 12px -2px rgb(15 23 42 / 0.07), 0 16px 34px -14px rgb(15 23 42 / 0.13);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --surface-canvas: #0e1210;
-  --surface-card: #161c19;
-  --surface-subtle: #1e2622;
-  --surface-inset: #25302a;
-  --surface-stage: #121815;
-  --text-primary: #f1f4f2;
-  --text-secondary: #9ba8a1;
-  --border-subtle: #2a352f;
-  --border-strong: #6d7d74;
+  --surface-canvas: #0b0f17;
+  --surface-card: #121824;
+  --surface-subtle: #1a2232;
+  --surface-inset: #232e42;
+  --surface-stage: #0e141f;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-subtle: #243044;
+  --border-strong: #64748b;
 
-  --action-bg: #e8f0ec;
-  --action-fg: #0e1210;
+  --action-bg: #f1f5f9;
+  --action-fg: #0b0f17;
   --action-hover: #ffffff;
 
-  --accent-emerald: #108550;
-  --accent-emerald-hover: #0d6e42;
+  --accent-emerald: #0d7a56;
+  --accent-emerald-hover: #0b6e4f;
 
-  --status-safe-bg: #0d2e20;
+  --status-safe-bg: #082f23;
   --status-safe-fg: #6ee7b7;
-  --status-safe-border: #1b5e40;
+  --status-safe-border: #135d43;
   --status-safe-bar: #34d399;
 
-  --status-ai-bg: #3b1510;
+  --status-ai-bg: #351317;
   --status-ai-fg: #fca5a5;
-  --status-ai-border: #7f2d22;
+  --status-ai-border: #7f232c;
   --status-ai-bar: #f87171;
 
-  --status-warn-bg: #362607;
+  --status-warn-bg: #332208;
   --status-warn-fg: #fcd34d;
-  --status-warn-border: #785413;
+  --status-warn-border: #784f12;
   --status-warn-bar: #fbbf24;
 
-  --reticle-color: #9ba8a1;
-  --elev-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -12px rgb(0 0 0 / 0.5);
+  --reticle-color: #64748b;
+  --reticle-active: #34d399;
+  --elev-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 14px 32px -12px rgb(0 0 0 / 0.65);
+  --elev-card-hover: 0 6px 18px -4px rgb(0 0 0 / 0.55), 0 20px 40px -14px rgb(0 0 0 / 0.75);
 }
 
 @theme {
@@ -116,10 +120,12 @@
   --color-warn-bar: var(--status-warn-bar);
 
   --shadow-card: var(--elev-card);
+  --shadow-card-hover: var(--elev-card-hover);
 
   --animate-scan: scan-sweep 1.6s ease-in-out infinite;
-  --animate-fade-in: fade-in 0.2s ease-out both;
-  --animate-rise: rise-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade-in: fade-in 0.22s ease-out both;
+  --animate-rise: rise-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-stagger: stagger-up 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-zoom-reveal: zoom-reveal 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   @keyframes scan-sweep {
@@ -152,6 +158,17 @@
     }
   }
 
+  @keyframes stagger-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   @keyframes zoom-reveal {
     from {
       opacity: 0;
@@ -161,6 +178,18 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+}
+
+@keyframes reticle-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    inset: 10px;
+  }
+  50% {
+    opacity: 1;
+    inset: 7px;
   }
 }
 
@@ -185,6 +214,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color 300ms ease,
+      color 300ms ease;
   }
 
   h1,
@@ -224,6 +256,22 @@
   }
 }
 
+.stagger-1 {
+  animation-delay: 0ms;
+}
+
+.stagger-2 {
+  animation-delay: 70ms;
+}
+
+.stagger-3 {
+  animation-delay: 135ms;
+}
+
+.stagger-4 {
+  animation-delay: 200ms;
+}
+
 /* Corner calibration ticks used on image inspection viewports */
 .forensic-frame {
   position: relative;
@@ -236,6 +284,9 @@
   inset: 10px;
   pointer-events: none;
   z-index: 10;
+  transition:
+    opacity 250ms ease,
+    inset 250ms ease;
 }
 
 .forensic-frame::before {
@@ -254,6 +305,26 @@
     linear-gradient(to left, var(--reticle-color) 2px, transparent 2px) 100% 100% / 12px 12px no-repeat,
     linear-gradient(to top, var(--reticle-color) 2px, transparent 2px) 100% 100% / 12px 12px no-repeat;
   opacity: 0.55;
+}
+
+.forensic-frame-interactive:hover::before,
+.forensic-frame-active::before {
+  background:
+    linear-gradient(to right, var(--reticle-active) 2px, transparent 2px) 0 0 / 13px 13px no-repeat,
+    linear-gradient(to bottom, var(--reticle-active) 2px, transparent 2px) 0 0 / 13px 13px no-repeat,
+    linear-gradient(to left, var(--reticle-active) 2px, transparent 2px) 100% 0 / 13px 13px no-repeat,
+    linear-gradient(to bottom, var(--reticle-active) 2px, transparent 2px) 100% 0 / 13px 13px no-repeat;
+  animation: reticle-pulse 1.6s ease-in-out infinite;
+}
+
+.forensic-frame-interactive:hover::after,
+.forensic-frame-active::after {
+  background:
+    linear-gradient(to right, var(--reticle-active) 2px, transparent 2px) 0 100% / 13px 13px no-repeat,
+    linear-gradient(to top, var(--reticle-active) 2px, transparent 2px) 0 100% / 13px 13px no-repeat,
+    linear-gradient(to left, var(--reticle-active) 2px, transparent 2px) 100% 100% / 13px 13px no-repeat,
+    linear-gradient(to top, var(--reticle-active) 2px, transparent 2px) 100% 100% / 13px 13px no-repeat;
+  animation: reticle-pulse 1.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

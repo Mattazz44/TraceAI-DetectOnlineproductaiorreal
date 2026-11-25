@@ -191,7 +191,7 @@ export default function HistoryScreen({
           <button
             type="button"
             onClick={onNewScan}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition hover:bg-emerald-brand-hover sm:min-h-11 sm:w-auto"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-[1px] hover:bg-emerald-brand-hover active:scale-95 sm:min-h-11 sm:w-auto"
           >
             <Plus className="size-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
             <span>Periksa Gambar Baru</span>
